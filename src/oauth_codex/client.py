@@ -92,6 +92,11 @@ class CodexOAuthLLM:
         api_mode: Literal["responses"] = "responses",
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
+        response_format: dict[str, Any] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+        strict_output: bool = False,
+        store: bool = False,
+        reasoning: dict[str, Any] | None = None,
         return_details: bool = False,
         validate_model: bool = False,
     ) -> str | GenerateResult:
@@ -110,6 +115,11 @@ class CodexOAuthLLM:
             messages=normalized_messages,
             tools=normalized_tools,
             tool_results=normalized_tool_results,
+            response_format=response_format,
+            tool_choice=tool_choice,
+            strict_output=strict_output,
+            store=store,
+            reasoning=reasoning,
         )
 
         if return_details:
@@ -131,6 +141,11 @@ class CodexOAuthLLM:
         api_mode: Literal["responses"] = "responses",
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
+        response_format: dict[str, Any] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+        strict_output: bool = False,
+        store: bool = False,
+        reasoning: dict[str, Any] | None = None,
         return_details: bool = False,
         validate_model: bool = False,
     ) -> str | GenerateResult:
@@ -149,6 +164,11 @@ class CodexOAuthLLM:
             messages=normalized_messages,
             tools=normalized_tools,
             tool_results=normalized_tool_results,
+            response_format=response_format,
+            tool_choice=tool_choice,
+            strict_output=strict_output,
+            store=store,
+            reasoning=reasoning,
         )
 
         if return_details:
@@ -170,6 +190,11 @@ class CodexOAuthLLM:
         api_mode: Literal["responses"] = "responses",
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
+        response_format: dict[str, Any] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+        strict_output: bool = False,
+        store: bool = False,
+        reasoning: dict[str, Any] | None = None,
         raw_events: bool = False,
         validate_model: bool = False,
     ) -> Iterator[str] | Iterator[StreamEvent]:
@@ -191,6 +216,11 @@ class CodexOAuthLLM:
             messages=normalized_messages,
             tools=normalized_tools,
             tool_results=normalized_tool_results,
+            response_format=response_format,
+            tool_choice=tool_choice,
+            strict_output=strict_output,
+            store=store,
+            reasoning=reasoning,
         )
         if raw_events:
             return events
@@ -205,6 +235,11 @@ class CodexOAuthLLM:
         api_mode: Literal["responses"] = "responses",
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
+        response_format: dict[str, Any] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+        strict_output: bool = False,
+        store: bool = False,
+        reasoning: dict[str, Any] | None = None,
         raw_events: bool = False,
         validate_model: bool = False,
     ) -> AsyncIterator[str] | AsyncIterator[StreamEvent]:
@@ -226,6 +261,11 @@ class CodexOAuthLLM:
             messages=normalized_messages,
             tools=normalized_tools,
             tool_results=normalized_tool_results,
+            response_format=response_format,
+            tool_choice=tool_choice,
+            strict_output=strict_output,
+            store=store,
+            reasoning=reasoning,
         )
         if raw_events:
             return events
@@ -355,6 +395,37 @@ class CodexOAuthLLM:
             raise LLMRequestError("codex backend path only supports /responses")
         return f"{self.chatgpt_base_url}{path}"
 
+    def _build_responses_payload(
+        self,
+        *,
+        model: str,
+        messages: list[Message],
+        tools: list[dict[str, Any]],
+        tool_results: list[ToolResult],
+        response_format: dict[str, Any] | None,
+        tool_choice: str | dict[str, Any] | None,
+        strict_output: bool,
+        store: bool,
+        reasoning: dict[str, Any] | None,
+        stream: bool,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": model,
+            "input": [*messages, *tool_results_to_response_items(tool_results)],
+            "instructions": self._derive_instructions(messages),
+            "store": store,
+            "stream": stream,
+        }
+        if tools:
+            payload["tools"] = to_responses_tools(tools, strict_output=strict_output)
+        if response_format is not None:
+            payload["text"] = {"format": dict(response_format)}
+        if tool_choice is not None:
+            payload["tool_choice"] = dict(tool_choice) if isinstance(tool_choice, dict) else tool_choice
+        if reasoning is not None:
+            payload["reasoning"] = dict(reasoning)
+        return payload
+
     def _generate_responses_sync(
         self,
         *,
@@ -362,12 +433,22 @@ class CodexOAuthLLM:
         messages: list[Message],
         tools: list[dict[str, Any]],
         tool_results: list[ToolResult],
+        response_format: dict[str, Any] | None,
+        tool_choice: str | dict[str, Any] | None,
+        strict_output: bool,
+        store: bool,
+        reasoning: dict[str, Any] | None,
     ) -> GenerateResult:
         events = self._stream_responses_sync(
             model=model,
             messages=messages,
             tools=tools,
             tool_results=tool_results,
+            response_format=response_format,
+            tool_choice=tool_choice,
+            strict_output=strict_output,
+            store=store,
+            reasoning=reasoning,
         )
         return self._collect_generate_result_from_stream_sync(events)
 
@@ -378,12 +459,22 @@ class CodexOAuthLLM:
         messages: list[Message],
         tools: list[dict[str, Any]],
         tool_results: list[ToolResult],
+        response_format: dict[str, Any] | None,
+        tool_choice: str | dict[str, Any] | None,
+        strict_output: bool,
+        store: bool,
+        reasoning: dict[str, Any] | None,
     ) -> GenerateResult:
         events = self._stream_responses_async(
             model=model,
             messages=messages,
             tools=tools,
             tool_results=tool_results,
+            response_format=response_format,
+            tool_choice=tool_choice,
+            strict_output=strict_output,
+            store=store,
+            reasoning=reasoning,
         )
         return await self._collect_generate_result_from_stream_async(events)
 
@@ -394,17 +485,25 @@ class CodexOAuthLLM:
         messages: list[Message],
         tools: list[dict[str, Any]],
         tool_results: list[ToolResult],
+        response_format: dict[str, Any] | None,
+        tool_choice: str | dict[str, Any] | None,
+        strict_output: bool,
+        store: bool,
+        reasoning: dict[str, Any] | None,
     ) -> Iterator[StreamEvent]:
         tokens = self._ensure_authenticated_sync()
-        payload: dict[str, Any] = {
-            "model": model,
-            "input": [*messages, *tool_results_to_response_items(tool_results)],
-            "instructions": self._derive_instructions(messages),
-            "store": False,
-            "stream": True,
-        }
-        if tools:
-            payload["tools"] = to_responses_tools(tools)
+        payload = self._build_responses_payload(
+            model=model,
+            messages=messages,
+            tools=tools,
+            tool_results=tool_results,
+            response_format=response_format,
+            tool_choice=tool_choice,
+            strict_output=strict_output,
+            store=store,
+            reasoning=reasoning,
+            stream=True,
+        )
 
         yield from self._stream_sse_sync(
             path="/responses",
@@ -420,17 +519,25 @@ class CodexOAuthLLM:
         messages: list[Message],
         tools: list[dict[str, Any]],
         tool_results: list[ToolResult],
+        response_format: dict[str, Any] | None,
+        tool_choice: str | dict[str, Any] | None,
+        strict_output: bool,
+        store: bool,
+        reasoning: dict[str, Any] | None,
     ) -> AsyncIterator[StreamEvent]:
         tokens = await self._ensure_authenticated_async()
-        payload: dict[str, Any] = {
-            "model": model,
-            "input": [*messages, *tool_results_to_response_items(tool_results)],
-            "instructions": self._derive_instructions(messages),
-            "store": False,
-            "stream": True,
-        }
-        if tools:
-            payload["tools"] = to_responses_tools(tools)
+        payload = self._build_responses_payload(
+            model=model,
+            messages=messages,
+            tools=tools,
+            tool_results=tool_results,
+            response_format=response_format,
+            tool_choice=tool_choice,
+            strict_output=strict_output,
+            store=store,
+            reasoning=reasoning,
+            stream=True,
+        )
 
         async for event in self._stream_sse_async(
             path="/responses",
@@ -462,6 +569,7 @@ class CodexOAuthLLM:
                         attempted_refresh = True
                         continue
                     if response.status_code >= 400:
+                        response.read()
                         raise LLMRequestError(self._error_message(response))
 
                     for event_name, data_text in self._iter_sse_events(response.iter_lines()):
@@ -500,6 +608,7 @@ class CodexOAuthLLM:
                         attempted_refresh = True
                         continue
                     if response.status_code >= 400:
+                        await response.aread()
                         raise LLMRequestError(self._error_message(response))
 
                     async for event_name, data_text in self._aiter_sse_events(response.aiter_lines()):

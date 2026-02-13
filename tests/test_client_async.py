@@ -31,6 +31,43 @@ async def test_agenerate_returns_text(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_agenerate_passes_responses_request_options(
+    monkeypatch: pytest.MonkeyPatch,
+    valid_tokens: OAuthTokens,
+) -> None:
+    llm = CodexOAuthLLM(token_store=InMemoryTokenStore(valid_tokens))
+    captured: dict[str, object] = {}
+
+    async def fake_stream_sse_async(**kwargs):
+        captured["payload"] = kwargs["payload"]
+        yield StreamEvent(type="text_delta", delta="ok")
+        yield StreamEvent(type="done")
+
+    monkeypatch.setattr(llm, "_stream_sse_async", fake_stream_sse_async)
+
+    text = await llm.agenerate(
+        model="gpt-5.3-codex",
+        prompt="hi",
+        tools=[{"type": "function", "name": "get_weather", "parameters": {"type": "object"}}],
+        response_format={"type": "json_object"},
+        tool_choice="required",
+        strict_output=True,
+        store=True,
+        reasoning={"effort": "medium"},
+    )
+
+    assert text == "ok"
+
+    payload = captured["payload"]
+    assert isinstance(payload, dict)
+    assert payload["store"] is True
+    assert payload["tool_choice"] == "required"
+    assert payload["reasoning"] == {"effort": "medium"}
+    assert payload["text"] == {"format": {"type": "json_object"}}
+    assert payload["tools"][0]["strict"] is True
+
+
+@pytest.mark.asyncio
 async def test_agenerate_stream_text(monkeypatch: pytest.MonkeyPatch) -> None:
     store = InMemoryTokenStore(
         OAuthTokens(

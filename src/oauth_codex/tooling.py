@@ -137,16 +137,23 @@ def normalize_tool_inputs(tools: list[ToolInput] | None) -> list[ToolSchema]:
     return normalized
 
 
-def to_responses_tools(tools: list[ToolSchema]) -> list[dict[str, Any]]:
-    return [
-        {
+def to_responses_tools(
+    tools: list[ToolSchema],
+    *,
+    strict_output: bool = False,
+) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for tool in tools:
+        item: dict[str, Any] = {
             "type": "function",
             "name": tool["name"],
             "description": tool.get("description", f"Tool `{tool['name']}`"),
-            "parameters": tool.get("parameters", {"type": "object", "properties": {}}),
+            "parameters": dict(tool.get("parameters", {"type": "object", "properties": {}})),
         }
-        for tool in tools
-    ]
+        if strict_output:
+            item["strict"] = True
+        normalized.append(item)
+    return normalized
 
 
 def serialize_tool_output(output: str | dict[str, Any]) -> str:

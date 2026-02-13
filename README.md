@@ -1,63 +1,32 @@
 # oauth-codex
 
-Python SDK for Codex OAuth authentication with manual localhost callback paste flow.
+Lightweight Python SDK for using the ChatGPT Codex backend with OAuth PKCE.
 
-## Features
+## Highlights
 
-- OAuth login with PKCE:
-  - Prints authorize URL
-  - Waits for callback URL via `input()`
-- Token persistence:
-  - Keychain first (`keyring`)
-  - File fallback: `~/.oauth_codex/auth.json`
-  - Auto-migrates legacy credentials from `codex-oauth-llm` / `~/.codex_oauth_llm/auth.json`
-- Lazy login on first generation request
-- Automatic token refresh with one retry
-- Model pass-through support (e.g. `gpt-5.3-codex`)
-- Text generation and streaming
+- OAuth login + token refresh
+- Keyring-first token storage with file fallback
+- Sync/async text generation and streaming
 - Manual function-calling workflow
-- Calls `https://chatgpt.com/backend-api/codex/responses` directly
+- Direct requests to `https://chatgpt.com/backend-api/codex/responses`
+
+## Requirements
+
+- Python 3.11+
 
 ## Install
 
 ```bash
-pip install -e .
+pip install oauth-codex
 ```
 
-## Automated PyPI publish (GitHub Actions)
-
-This repository includes `.github/workflows/publish-pypi.yml`.
-
-- Trigger: push a tag matching `v*` (example: `v0.2.1`)
-- Build: `python -m build` and `twine check`
-- Publish: `pypa/gh-action-pypi-publish@release/v1` with OIDC Trusted Publishing
-
-### One-time PyPI setup
-
-1. Create your package on PyPI once, or add a pending publisher for a new package.
-2. In PyPI project settings, add a Trusted Publisher (GitHub Actions):
-   - Owner: your GitHub user or org
-   - Repository name: `oauth-codex`
-   - Workflow name: `publish-pypi.yml`
-   - Environment name: `pypi`
-
-### Release flow
-
-1. Bump the version in `pyproject.toml`.
-2. Push a version tag (must match `pyproject.toml` version):
+For local development:
 
 ```bash
-git tag v0.2.1
-git push origin v0.2.1
+python3 -m pip install -e ".[dev]"
 ```
 
-3. Check the GitHub Actions run. After success, install from PyPI:
-
-```bash
-python3 -m pip install oauth-codex==0.2.1
-```
-
-## Quickstart
+## Quick Start
 
 ```python
 from oauth_codex import CodexOAuthLLM
@@ -71,27 +40,80 @@ text = llm.generate(
 print(text)
 ```
 
-On first run, SDK prints an OAuth login URL. Complete auth in browser, then paste redirected localhost URL.
+On first use, the SDK prints an OAuth URL. Complete sign-in in your browser, then paste the localhost callback URL.
 
-## Smoke example
+## Request Options
 
-After editable install, run:
+`generate` / `agenerate` / `generate_stream` / `agenerate_stream` support:
 
-```bash
-python examples/login_smoke_test.py --model gpt-5.3-codex --prompt "hello"
+- `response_format` -> sent as `text.format`
+- `tool_choice` -> sent as-is
+- `strict_output=True` -> adds `"strict": true` to each function tool
+- `reasoning` -> sent as-is
+- `store` -> sent as-is
+
+Example:
+
+```python
+result = llm.generate(
+    model="gpt-5.3-codex",
+    prompt="Return valid JSON with title and summary",
+    response_format={"type": "json_object"},
+    tool_choice="required",
+    strict_output=True,
+    reasoning={"effort": "high"},
+    store=False,
+    return_details=True,
+)
 ```
 
-## Manual function calling
+Note: the current codex backend rejects `store=True` with `HTTP 400: Store must be set to false`.
+
+## Streaming
+
+```python
+for chunk in llm.generate_stream(
+    model="gpt-5.3-codex",
+    prompt="Write one short paragraph about PKCE.",
+):
+    print(chunk, end="", flush=True)
+```
+
+## Async
+
+```python
+import asyncio
+from oauth_codex import CodexOAuthLLM
+
+
+async def main() -> None:
+    llm = CodexOAuthLLM()
+    text = await llm.agenerate(
+        model="gpt-5.3-codex",
+        prompt="Summarize OAuth in 2 lines.",
+    )
+    print(text)
+
+
+asyncio.run(main())
+```
+
+## Manual Function Calling
+
+When tools are requested:
+
+- `return_details=False` raises `ToolCallRequiredError`
+- `return_details=True` returns tool calls in `GenerateResult`
 
 ```python
 from oauth_codex import CodexOAuthLLM
 
-llm = CodexOAuthLLM()
 
 def get_weather(city: str) -> str:
-    """Return weather summary for a city."""
     return f"Sunny in {city}"
 
+
+llm = CodexOAuthLLM()
 result = llm.generate(
     model="gpt-5.3-codex",
     messages=[{"role": "user", "content": "What is the weather in Seoul?"}],
@@ -100,27 +122,36 @@ result = llm.generate(
 )
 
 if result.finish_reason == "tool_calls":
-    tool_results = []
-    for tc in result.tool_calls:
-        if tc.name == "get_weather":
-            city = (tc.arguments or {}).get("city", "Seoul")
-            tool_results.append({
-                "tool_call_id": tc.id,
-                "name": tc.name,
-                "output": get_weather(city),
-            })
-
-    final_result = llm.generate(
+    tool_results = [
+        {
+            "tool_call_id": result.tool_calls[0].id,
+            "name": result.tool_calls[0].name,
+            "output": get_weather((result.tool_calls[0].arguments or {}).get("city", "Seoul")),
+        }
+    ]
+    final = llm.generate(
         model="gpt-5.3-codex",
         messages=[{"role": "user", "content": "What is the weather in Seoul?"}],
         tools=[get_weather],
         tool_results=tool_results,
         return_details=True,
     )
-    print(final_result.text)
+    print(final.text)
 ```
 
-## Environment variables
+For tool-enabled streaming, set `raw_events=True` and consume `StreamEvent` objects.
+
+## Authentication and Storage
+
+- If no valid token exists, login is triggered automatically
+- Storage priority:
+  - Keyring service: `oauth-codex`
+  - File fallback: `~/.oauth_codex/auth.json`
+- Legacy credentials are migrated from:
+  - Keyring service: `codex-oauth-llm`
+  - File path: `~/.codex_oauth_llm/auth.json`
+
+## Environment Variables
 
 - `CODEX_OAUTH_CLIENT_ID`
 - `CODEX_OAUTH_SCOPE`
@@ -131,8 +162,40 @@ if result.finish_reason == "tool_calls":
 - `CODEX_OAUTH_TOKEN_ENDPOINT`
 - `CODEX_OAUTH_ORIGINATOR`
 
-## Troubleshooting
+## Smoke Tests
 
-- This SDK is codex-backend only:
-  - Requests go to `https://chatgpt.com/backend-api/codex/responses`.
-  - `chat_completions` mode and `/models` validation are not supported.
+Run from repository root after editable install:
+
+```bash
+python3 examples/login_smoke_test.py --model gpt-5.3-codex --prompt "hello"
+python3 examples/request_options_smoke_test.py --model gpt-5.3-codex
+```
+
+## Development
+
+```bash
+python3 -m pip install -e ".[dev]"
+pytest -q
+```
+
+## Release
+
+1. Bump `project.version` in `pyproject.toml`.
+2. Tag and push:
+
+```bash
+git tag v0.3.0
+git push origin main
+git push origin v0.3.0
+```
+
+3. Verify GitHub Actions publish and install:
+
+```bash
+pip install -U oauth-codex==0.3.0
+```
+
+## Notes
+
+- This SDK supports only `api_mode="responses"` for the codex backend.
+- `validate_model=True` is unsupported in codex-backend mode.

@@ -119,6 +119,61 @@ def test_generate_calls_model_validation_when_enabled(monkeypatch: pytest.Monkey
     assert called["validate"] == 1
 
 
+def test_generate_passes_responses_request_options(
+    monkeypatch: pytest.MonkeyPatch,
+    valid_tokens: OAuthTokens,
+) -> None:
+    llm = CodexOAuthLLM(token_store=InMemoryTokenStore(valid_tokens))
+    captured: dict[str, object] = {}
+
+    def fake_stream_sse_sync(**kwargs):
+        captured["payload"] = kwargs["payload"]
+        return _text_stream("ok")
+
+    monkeypatch.setattr(llm, "_stream_sse_sync", fake_stream_sse_sync)
+
+    text = llm.generate(
+        model="gpt-5.3-codex",
+        prompt="hi",
+        tools=[{"type": "function", "name": "get_weather", "parameters": {"type": "object"}}],
+        response_format={"type": "json_object"},
+        tool_choice={"type": "function", "name": "get_weather"},
+        strict_output=True,
+        store=True,
+        reasoning={"effort": "high"},
+    )
+
+    assert text == "ok"
+
+    payload = captured["payload"]
+    assert isinstance(payload, dict)
+    assert payload["store"] is True
+    assert payload["tool_choice"] == {"type": "function", "name": "get_weather"}
+    assert payload["reasoning"] == {"effort": "high"}
+    assert payload["text"] == {"format": {"type": "json_object"}}
+    assert payload["tools"][0]["strict"] is True
+
+
+def test_generate_defaults_to_store_false(
+    monkeypatch: pytest.MonkeyPatch,
+    valid_tokens: OAuthTokens,
+) -> None:
+    llm = CodexOAuthLLM(token_store=InMemoryTokenStore(valid_tokens))
+    captured: dict[str, object] = {}
+
+    def fake_stream_sse_sync(**kwargs):
+        captured["payload"] = kwargs["payload"]
+        return _text_stream("ok")
+
+    monkeypatch.setattr(llm, "_stream_sse_sync", fake_stream_sse_sync)
+
+    llm.generate(model="gpt-5.3-codex", prompt="hi")
+
+    payload = captured["payload"]
+    assert isinstance(payload, dict)
+    assert payload["store"] is False
+
+
 def test_generate_propagates_model_validation_error() -> None:
     llm = CodexOAuthLLM(token_store=InMemoryTokenStore(OAuthTokens("a", refresh_token="r", expires_at=9_999_999_999)))
 
