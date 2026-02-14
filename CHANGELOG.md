@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.0.0
+
+### Breaking
+
+- `CodexOAuthLLM` alias 제거
+- legacy `generate/agenerate/generate_stream/agenerate_stream` 공개 표면 제거
+- 패키지 내부 구조를 OpenAI 2.17 스타일로 재구성
+
+### Added
+
+- OpenAI 스타일 코어 모듈
+  - `_client`, `_base_client`, `_resource`, `_types`, `_models`, `_exceptions`, `_module_client`
+- `resources/` + `types/` 계층 도입
+- module-level lazy client 패턴 (`oauth_codex.responses.create(...)`)
+- OpenAI 2.17 리소스 트리 골격 전체 노출
+- `with_raw_response`, `with_streaming_response` 계층 확장
+- `pydantic` 기반 모델 계층
+
+### Supported Runtime Resources
+
+- `responses` (+ `input_tokens`)
+- `files`
+- `vector_stores` (+ `files`, `file_batches`)
+- `models` (`capabilities`)
+
+### Unsupported Runtime Resources
+
+- 구조/모듈/클래스는 노출
+- 호출 시 `NotSupportedError(code="not_supported")`
+
 ## 0.6.0
 
 ### Added
@@ -8,60 +38,18 @@
   - body 옵션: `max_tool_calls`, `parallel_tool_calls`, `truncation`
   - request 옵션: `extra_headers`, `extra_query`, `extra_body`
 - 요청 헤더 보호 정책 추가
-  - `Authorization`, `ChatGPT-Account-ID`, `Content-Type`는 `extra_headers`로 override 불가
 - Codex profile `previous_response_id` 내부 연속성 에뮬레이션
-  - backend 미지원 필드를 서버로 전달하지 않고 로컬 저장소(`responses/index.json`) 기반으로 체인 복원
-  - 미존재 `previous_response_id`는 `SDKRequestError(status_code=404, provider_code="not_found")`로 반환
 
 ## 0.5.0
 
 ### Added
 
 - Codex profile local compatibility backend
-  - `files.create` now auto-falls back to local persistent storage
-  - `vector_stores.create/retrieve/list/update/delete/search` now auto-fall back to local persistent storage
 - Local compatibility storage path configuration
-  - constructor arg: `compat_storage_dir`
-  - env var: `CODEX_COMPAT_STORAGE_DIR`
-
-### Changed
-
-- `validate_model=True` on codex profile now performs local validation (model must be non-empty string) instead of raising unsupported error.
 
 ## 0.4.0
 
 ### Added
 
 - OpenAI-compatible client surface
-  - `OAuthCodexClient` / `AsyncOAuthCodexClient`
-  - `responses.create`
-  - `responses.input_tokens.count`
-  - `files.create`
-  - `vector_stores.*`
-  - `models.capabilities`
-- Response compatibility type (`ResponseCompat`) with
-  - `id`, `output`, `output_text`, `usage`, `error`
-  - `reasoning_summary`, `reasoning_items`, `encrypted_reasoning_content`
-- Validation modes: `warn` / `error` / `ignore`
-- Store behavior modes: `auto_disable` / `error` / `passthrough`
-- Standardized request error model: `SDKRequestError`
-- Token store failure exceptions
-  - `TokenStoreReadError`, `TokenStoreWriteError`, `TokenStoreDeleteError`
-- `NotSupportedError`, `ContinuityError`, `ParameterValidationError`
-- Streaming event schema v1 with reasoning/tool lifecycle events
-- Observability hooks
-  - `on_request_start`, `on_request_end`, `on_auth_refresh`, `on_error`
-- Retry policy defaults
-  - 401 refresh retry
-  - 429/5xx exponential backoff with jitter
-
-### Changed
-
-- `store=True` on codex OAuth profile is auto-disabled by default.
-- Usage model now exposes unified metrics fields (`cached_tokens`, `reasoning_tokens`) while keeping backward-compatible aliases.
-
-### Docs
-
-- Added `docs/migration_openai_to_oauth_codex.md`
-- Added `docs/stream_event_schema_v1.md`
-- Updated `README.md` with compatibility, policy, and retry sections.
+- 표준 에러/재시도/관측성 훅
