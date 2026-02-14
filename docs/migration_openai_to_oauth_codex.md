@@ -61,6 +61,16 @@ client = AsyncOAuthCodexClient()
 - `service_tier`: 기본 ignore+warn
 - `validation_mode`: `warn`(기본), `error`, `ignore`
 
+Codex profile에서 backend 미지원 기능은 SDK 내부에서 자동 보완됩니다.
+
+- `files.create` -> 로컬 영속 저장소로 처리
+- `vector_stores.*` -> 로컬 영속 저장소로 처리
+- `validate_model=True` -> 로컬 모델명 검증(non-empty string)
+- 저장 경로 우선순위
+  - `compat_storage_dir` 인자
+  - `CODEX_COMPAT_STORAGE_DIR`
+  - `~/.oauth_codex/compat`
+
 ## 6) Streaming Event Mapping
 
 Recommended parser targets:

@@ -175,11 +175,11 @@ def test_generate_defaults_to_store_false(
     assert payload["store"] is False
 
 
-def test_generate_propagates_model_validation_error() -> None:
+def test_generate_validate_model_rejects_blank_model() -> None:
     llm = CodexOAuthLLM(token_store=InMemoryTokenStore(OAuthTokens("a", refresh_token="r", expires_at=9_999_999_999)))
 
     with pytest.raises(ModelValidationError):
-        llm.generate(model="gpt-5.3-codex", prompt="hi", validate_model=True)
+        llm.generate(model="", prompt="hi", validate_model=True)
 
 
 def test_generate_requires_prompt_or_messages_exclusively(valid_tokens: OAuthTokens) -> None:

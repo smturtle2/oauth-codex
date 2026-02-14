@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 from oauth_codex.client import CodexOAuthLLM
-from oauth_codex.errors import ModelValidationError
 from oauth_codex.types import OAuthConfig, OAuthTokens, StreamEvent
 from conftest import InMemoryTokenStore
 
@@ -96,7 +95,7 @@ async def test_agenerate_stream_text(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_validate_model_async_is_unsupported() -> None:
+async def test_validate_model_async_uses_local_validation() -> None:
     store = InMemoryTokenStore(
         OAuthTokens(
             access_token="a",
@@ -105,6 +104,13 @@ async def test_validate_model_async_is_unsupported() -> None:
         )
     )
     llm = CodexOAuthLLM(token_store=store, oauth_config=OAuthConfig(client_id="cid"))
+    llm._stream_sse_async = _ok_stream_async  # type: ignore[method-assign]
 
-    with pytest.raises(ModelValidationError):
-        await llm.agenerate(model="gpt-5.3-codex", prompt="hi", validate_model=True)
+    text = await llm.agenerate(model="gpt-5.3-codex", prompt="hi", validate_model=True)
+    assert text == "ok"
+
+
+async def _ok_stream_async(**kwargs):
+    _ = kwargs
+    yield StreamEvent(type="text_delta", delta="ok")
+    yield StreamEvent(type="done")

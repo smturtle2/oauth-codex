@@ -6,6 +6,7 @@ import random
 import time
 import uuid
 import warnings
+from pathlib import Path
 from typing import Any, AsyncIterator, Callable, Iterator, Literal
 
 import httpx
@@ -22,6 +23,7 @@ from .auth import (
     refresh_tokens,
     refresh_tokens_async,
 )
+from .compat_store import LocalCompatStore
 from .errors import (
     AuthRequiredError,
     ContinuityError,
@@ -69,6 +71,7 @@ class OAuthCodexClient:
         store_behavior: StoreBehavior = "auto_disable",
         max_retries: int = 2,
         backoff_base_seconds: float = 0.25,
+        compat_storage_dir: str | Path | None = None,
         on_request_start: Callable[[dict[str, Any]], None] | None = None,
         on_request_end: Callable[[dict[str, Any]], None] | None = None,
         on_auth_refresh: Callable[[dict[str, Any]], None] | None = None,
@@ -82,6 +85,7 @@ class OAuthCodexClient:
         self.store_behavior = store_behavior
         self.max_retries = max(0, max_retries)
         self.backoff_base_seconds = max(0.05, backoff_base_seconds)
+        self._compat_store = LocalCompatStore(base_dir=compat_storage_dir)
         self.on_request_start = on_request_start
         self.on_request_end = on_request_end
         self.on_auth_refresh = on_auth_refresh
@@ -602,11 +606,11 @@ class OAuthCodexClient:
         purpose: str,
         **metadata: Any,
     ) -> dict[str, Any]:
-        if not self._supports_remote_files_vector():
-            raise NotSupportedError(
-                "files.create is not supported on codex OAuth profile",
-                code="files_not_supported_on_codex_oauth",
-            )
+        if self._is_codex_profile():
+            try:
+                return self._compat_store.create_file(file=file, purpose=purpose, metadata=metadata)
+            except Exception as exc:
+                self._raise_local_compat_error(exc)
         files = {"file": file}
         data = {"purpose": purpose, **metadata}
         return self._request_multipart_sync(path="/files", data=data, files=files)
@@ -618,32 +622,48 @@ class OAuthCodexClient:
         purpose: str,
         **metadata: Any,
     ) -> dict[str, Any]:
-        if not self._supports_remote_files_vector():
-            raise NotSupportedError(
-                "files.create is not supported on codex OAuth profile",
-                code="files_not_supported_on_codex_oauth",
-            )
+        if self._is_codex_profile():
+            try:
+                return await asyncio.to_thread(
+                    self._compat_store.create_file,
+                    file=file,
+                    purpose=purpose,
+                    metadata=metadata,
+                )
+            except Exception as exc:
+                self._raise_local_compat_error(exc)
         files = {"file": file}
         data = {"purpose": purpose, **metadata}
         return await self._request_multipart_async(path="/files", data=data, files=files)
 
     def vector_store_request(self, *, method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        if not self._supports_remote_files_vector():
-            raise NotSupportedError(
-                "vector_stores is not supported on codex OAuth profile",
-                code="vector_stores_not_supported_on_codex_oauth",
-            )
+        normalized_payload = payload or {}
+        if self._is_codex_profile():
+            try:
+                return self._compat_vector_store_request(
+                    method=method,
+                    path=path,
+                    payload=normalized_payload,
+                )
+            except Exception as exc:
+                self._raise_local_compat_error(exc)
         return self._request_json_sync(path=path, payload=payload or {}, method=method)
 
     async def avector_store_request(
         self, *, method: str, path: str, payload: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        if not self._supports_remote_files_vector():
-            raise NotSupportedError(
-                "vector_stores is not supported on codex OAuth profile",
-                code="vector_stores_not_supported_on_codex_oauth",
-            )
-        return await self._request_json_async(path=path, payload=payload or {}, method=method)
+        normalized_payload = payload or {}
+        if self._is_codex_profile():
+            try:
+                return await asyncio.to_thread(
+                    self._compat_vector_store_request,
+                    method=method,
+                    path=path,
+                    payload=normalized_payload,
+                )
+            except Exception as exc:
+                self._raise_local_compat_error(exc)
+        return await self._request_json_async(path=path, payload=normalized_payload, method=method)
 
     def _require_responses_mode(self, api_mode: str) -> None:
         if api_mode != "responses":
@@ -1066,6 +1086,84 @@ class OAuthCodexClient:
     def _supports_remote_files_vector(self) -> bool:
         return not self._is_codex_profile()
 
+    def _raise_local_compat_error(self, exc: Exception) -> None:
+        if isinstance(exc, (NotSupportedError, ParameterValidationError, SDKRequestError)):
+            raise exc
+        if isinstance(exc, (json.JSONDecodeError, OSError)):
+            raise SDKRequestError(
+                status_code=None,
+                provider_code="local_compat_storage_error",
+                user_message="Local compatibility storage operation failed",
+                retryable=False,
+                raw_error={"error": str(exc)},
+            ) from exc
+        if isinstance(exc, KeyError):
+            message = str(exc).strip("'") or "resource not found"
+            raise SDKRequestError(
+                status_code=404,
+                provider_code="not_found",
+                user_message=message,
+                retryable=False,
+                raw_error={"error": message},
+            ) from exc
+        if isinstance(exc, (TypeError, ValueError)):
+            raise ParameterValidationError(str(exc)) from exc
+        raise SDKRequestError(
+            status_code=None,
+            provider_code="local_compat_storage_error",
+            user_message="Local compatibility storage operation failed",
+            retryable=False,
+            raw_error={"error": str(exc)},
+        ) from exc
+
+    def _compat_vector_store_request(
+        self,
+        *,
+        method: str,
+        path: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        normalized_method = method.upper()
+        if path == "/vector_stores":
+            if normalized_method == "POST":
+                return self._compat_store.create_vector_store(payload)
+            if normalized_method == "GET":
+                return self._compat_store.list_vector_stores(payload)
+
+        if path.startswith("/vector_stores/"):
+            tail = path[len("/vector_stores/") :]
+            if tail.endswith("/search"):
+                vector_store_id = tail[: -len("/search")]
+                if not vector_store_id or "/" in vector_store_id:
+                    raise ValueError("invalid vector_store_id")
+                if normalized_method != "POST":
+                    raise ValueError("vector_stores.search only supports POST")
+                query = payload.get("query")
+                max_num_results = payload.get("max_num_results", 10)
+                return self._compat_store.search_vector_store(
+                    vector_store_id,
+                    query=query,
+                    max_num_results=max_num_results,
+                )
+
+            if not tail or "/" in tail:
+                raise ValueError("invalid vector_store_id")
+            if normalized_method == "GET":
+                return self._compat_store.retrieve_vector_store(tail)
+            if normalized_method == "POST":
+                return self._compat_store.update_vector_store(tail, payload)
+            if normalized_method == "DELETE":
+                return self._compat_store.delete_vector_store(tail)
+
+        raise NotSupportedError(
+            f"{path} is not supported on codex OAuth profile",
+            code="not_supported_on_codex_oauth",
+        )
+
+    def _validate_model_locally(self, model: str) -> None:
+        if not isinstance(model, str) or not model.strip():
+            raise ModelValidationError("model must be a non-empty string")
+
     def _emit_hook(self, hook: Callable[[dict[str, Any]], None] | None, payload: dict[str, Any]) -> None:
         if hook is None:
             return
@@ -1193,17 +1291,21 @@ class OAuthCodexClient:
             ) from exc
 
     def _validate_model_sync(self, model: str, tokens: OAuthTokens) -> None:
-        _ = model, tokens
+        _ = tokens
+        if self._is_codex_profile():
+            self._validate_model_locally(model)
+            return
         raise ModelValidationError(
-            "Model validation via /models is unavailable on chatgpt.com/backend-api/codex. "
-            "Disable validate_model."
+            "Model validation via /models is unavailable on this profile."
         )
 
     async def _validate_model_async(self, model: str, tokens: OAuthTokens) -> None:
-        _ = model, tokens
+        _ = tokens
+        if self._is_codex_profile():
+            self._validate_model_locally(model)
+            return
         raise ModelValidationError(
-            "Model validation via /models is unavailable on chatgpt.com/backend-api/codex. "
-            "Disable validate_model."
+            "Model validation via /models is unavailable on this profile."
         )
 
     def _auth_headers(self, tokens: OAuthTokens) -> dict[str, str]:
@@ -2563,6 +2665,7 @@ class AsyncOAuthCodexClient:
         store_behavior: StoreBehavior = "auto_disable",
         max_retries: int = 2,
         backoff_base_seconds: float = 0.25,
+        compat_storage_dir: str | Path | None = None,
         on_request_start: Callable[[dict[str, Any]], None] | None = None,
         on_request_end: Callable[[dict[str, Any]], None] | None = None,
         on_auth_refresh: Callable[[dict[str, Any]], None] | None = None,
@@ -2577,6 +2680,7 @@ class AsyncOAuthCodexClient:
             store_behavior=store_behavior,
             max_retries=max_retries,
             backoff_base_seconds=backoff_base_seconds,
+            compat_storage_dir=compat_storage_dir,
             on_request_start=on_request_start,
             on_request_end=on_request_end,
             on_auth_refresh=on_auth_refresh,
