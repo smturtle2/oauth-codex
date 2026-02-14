@@ -795,6 +795,131 @@ class OAuthCodexClient:
             return [dict(item) for item in messages]
         raise TypeError("Unsupported `input` type")
 
+    def _normalize_continuation_items(self, items: Any) -> list[Message]:
+        if not isinstance(items, list):
+            raise ValueError("continuation_input must be a list")
+        normalized: list[Message] = []
+        for item in items:
+            if not isinstance(item, dict):
+                raise ValueError("continuation_input must contain dictionaries")
+            normalized.append(dict(item))
+        return normalized
+
+    def _build_effective_responses_input(
+        self,
+        *,
+        messages: list[Message],
+        tool_results: list[ToolResult],
+        previous_response_id: str | None,
+    ) -> tuple[list[Message], str | None]:
+        current_turn: list[Message] = [*messages, *tool_results_to_response_items(tool_results)]
+        if not self._is_codex_profile() or not previous_response_id:
+            return current_turn, previous_response_id
+
+        try:
+            record = self._compat_store.get_response_continuity(previous_response_id)
+            prior_items = self._normalize_continuation_items(record.get("continuation_input"))
+        except Exception as exc:
+            self._raise_local_compat_error(exc)
+            return [], None
+
+        return [*prior_items, *current_turn], None
+
+    def _extract_output_items_for_continuation(
+        self,
+        *,
+        raw_response: dict[str, Any] | None,
+        text_parts: list[str],
+        tool_calls: list[ToolCall],
+    ) -> list[Message]:
+        if isinstance(raw_response, dict):
+            candidates: list[Any] = [raw_response.get("output")]
+            response_obj = raw_response.get("response")
+            if isinstance(response_obj, dict):
+                candidates.append(response_obj.get("output"))
+            for candidate in candidates:
+                if not isinstance(candidate, list):
+                    continue
+                normalized = [dict(item) for item in candidate if isinstance(item, dict)]
+                if normalized:
+                    return normalized
+
+        output_items: list[Message] = []
+        text = "".join(text_parts)
+        if text:
+            output_items.append(
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": text}],
+                }
+            )
+        for call in tool_calls:
+            output_items.append(
+                {
+                    "type": "function_call",
+                    "call_id": call.id,
+                    "name": call.name,
+                    "arguments": call.arguments_json,
+                }
+            )
+        return output_items
+
+    def _persist_response_continuity_sync(
+        self,
+        *,
+        model: str,
+        request_input: list[Message],
+        response_id: str | None,
+        previous_response_id: str | None,
+        raw_response: dict[str, Any] | None,
+        text_parts: list[str],
+        tool_calls: list[ToolCall],
+    ) -> None:
+        if not self._is_codex_profile():
+            return
+        if not response_id:
+            return
+
+        try:
+            normalized_request_input = self._normalize_continuation_items(request_input)
+            output_items = self._extract_output_items_for_continuation(
+                raw_response=raw_response,
+                text_parts=text_parts,
+                tool_calls=tool_calls,
+            )
+            continuation_input = [*normalized_request_input, *output_items]
+            self._compat_store.upsert_response_continuity(
+                response_id=response_id,
+                model=model,
+                continuation_input=continuation_input,
+                previous_response_id=previous_response_id,
+            )
+        except Exception as exc:
+            self._raise_local_compat_error(exc)
+
+    async def _persist_response_continuity_async(
+        self,
+        *,
+        model: str,
+        request_input: list[Message],
+        response_id: str | None,
+        previous_response_id: str | None,
+        raw_response: dict[str, Any] | None,
+        text_parts: list[str],
+        tool_calls: list[ToolCall],
+    ) -> None:
+        await asyncio.to_thread(
+            self._persist_response_continuity_sync,
+            model=model,
+            request_input=request_input,
+            response_id=response_id,
+            previous_response_id=previous_response_id,
+            raw_response=raw_response,
+            text_parts=text_parts,
+            tool_calls=tool_calls,
+        )
+
     def _generate_result_to_response(
         self,
         result: GenerateResult,
@@ -1775,9 +1900,14 @@ class OAuthCodexClient:
                 validation_mode=mode,
             )
 
+        effective_input, upstream_previous_response_id = self._build_effective_responses_input(
+            messages=messages,
+            tool_results=tool_results,
+            previous_response_id=previous_response_id,
+        )
         payload: dict[str, Any] = {
             "model": model,
-            "input": [*messages, *tool_results_to_response_items(tool_results)],
+            "input": effective_input,
             "instructions": instructions or self._derive_instructions(messages),
             "store": normalized_store,
             "stream": stream,
@@ -1806,8 +1936,8 @@ class OAuthCodexClient:
             payload["parallel_tool_calls"] = normalized_parallel_tool_calls
         if normalized_truncation is not None:
             payload["truncation"] = normalized_truncation
-        if previous_response_id:
-            payload["previous_response_id"] = previous_response_id
+        if upstream_previous_response_id:
+            payload["previous_response_id"] = upstream_previous_response_id
         if normalized_extra_body:
             payload.update(normalized_extra_body)
         return payload
@@ -1983,8 +2113,20 @@ class OAuthCodexClient:
             extra_headers, validation_mode=mode
         )
         normalized_extra_query = self._validate_extra_query(extra_query, validation_mode=mode)
+        request_input: list[Message] = []
+        if self._is_codex_profile():
+            raw_request_input = payload.get("input")
+            if isinstance(raw_request_input, list):
+                request_input = [dict(item) for item in raw_request_input if isinstance(item, dict)]
 
-        yield from self._stream_sse_sync(
+        text_parts: list[str] = []
+        tool_calls_acc: list[ToolCall] = []
+        raw_response: dict[str, Any] | None = None
+        response_id: str | None = None
+        saw_error = False
+        persisted = False
+
+        for event in self._stream_sse_sync(
             path="/responses",
             payload=payload,
             parser=self._map_responses_stream,
@@ -1992,7 +2134,51 @@ class OAuthCodexClient:
             extra_headers=normalized_extra_headers,
             extra_query=normalized_extra_query,
             validation_mode=mode,
-        )
+        ):
+            if self._is_codex_profile():
+                if event.type == "text_delta" and isinstance(event.delta, str):
+                    text_parts.append(event.delta)
+                elif event.type == "tool_call_done" and event.tool_call is not None:
+                    tool_calls_acc.append(event.tool_call)
+                elif event.type == "error":
+                    saw_error = True
+
+                if isinstance(event.raw, dict):
+                    raw_response = event.raw
+                    maybe_response_id = self._extract_response_id(event.raw)
+                    if maybe_response_id:
+                        response_id = maybe_response_id
+                if event.response_id:
+                    response_id = event.response_id
+
+                if (
+                    not persisted
+                    and not saw_error
+                    and event.type in {"response_completed", "done"}
+                ):
+                    self._persist_response_continuity_sync(
+                        model=model,
+                        request_input=request_input,
+                        response_id=response_id,
+                        previous_response_id=previous_response_id,
+                        raw_response=raw_response,
+                        text_parts=text_parts,
+                        tool_calls=tool_calls_acc,
+                    )
+                    persisted = True
+
+            yield event
+
+        if self._is_codex_profile() and not persisted and not saw_error:
+            self._persist_response_continuity_sync(
+                model=model,
+                request_input=request_input,
+                response_id=response_id,
+                previous_response_id=previous_response_id,
+                raw_response=raw_response,
+                text_parts=text_parts,
+                tool_calls=tool_calls_acc,
+            )
 
     async def _stream_responses_async(
         self,
@@ -2053,6 +2239,18 @@ class OAuthCodexClient:
             extra_headers, validation_mode=mode
         )
         normalized_extra_query = self._validate_extra_query(extra_query, validation_mode=mode)
+        request_input: list[Message] = []
+        if self._is_codex_profile():
+            raw_request_input = payload.get("input")
+            if isinstance(raw_request_input, list):
+                request_input = [dict(item) for item in raw_request_input if isinstance(item, dict)]
+
+        text_parts: list[str] = []
+        tool_calls_acc: list[ToolCall] = []
+        raw_response: dict[str, Any] | None = None
+        response_id: str | None = None
+        saw_error = False
+        persisted = False
 
         async for event in self._stream_sse_async(
             path="/responses",
@@ -2063,7 +2261,50 @@ class OAuthCodexClient:
             extra_query=normalized_extra_query,
             validation_mode=mode,
         ):
+            if self._is_codex_profile():
+                if event.type == "text_delta" and isinstance(event.delta, str):
+                    text_parts.append(event.delta)
+                elif event.type == "tool_call_done" and event.tool_call is not None:
+                    tool_calls_acc.append(event.tool_call)
+                elif event.type == "error":
+                    saw_error = True
+
+                if isinstance(event.raw, dict):
+                    raw_response = event.raw
+                    maybe_response_id = self._extract_response_id(event.raw)
+                    if maybe_response_id:
+                        response_id = maybe_response_id
+                if event.response_id:
+                    response_id = event.response_id
+
+                if (
+                    not persisted
+                    and not saw_error
+                    and event.type in {"response_completed", "done"}
+                ):
+                    await self._persist_response_continuity_async(
+                        model=model,
+                        request_input=request_input,
+                        response_id=response_id,
+                        previous_response_id=previous_response_id,
+                        raw_response=raw_response,
+                        text_parts=text_parts,
+                        tool_calls=tool_calls_acc,
+                    )
+                    persisted = True
+
             yield event
+
+        if self._is_codex_profile() and not persisted and not saw_error:
+            await self._persist_response_continuity_async(
+                model=model,
+                request_input=request_input,
+                response_id=response_id,
+                previous_response_id=previous_response_id,
+                raw_response=raw_response,
+                text_parts=text_parts,
+                tool_calls=tool_calls_acc,
+            )
 
     def _stream_sse_sync(
         self,

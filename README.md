@@ -87,6 +87,7 @@ print(response.usage)
 Codex profile(`https://chatgpt.com/backend-api/codex`)에서는 backend 미지원 기능을 라이브러리 내부에서 자동으로 보완합니다.
 
 - `files.create`, `vector_stores.*` -> 로컬 영속 저장소로 처리
+- `previous_response_id` -> 로컬 연속성 저장소(`responses/index.json`) 기반으로 내부 에뮬레이션
 - `validate_model=True` -> 로컬 모델명(non-empty string) 검증
 - 저장 경로 우선순위
   - `compat_storage_dir` 인자
@@ -110,6 +111,7 @@ client = OAuthCodexClient(compat_storage_dir="~/.oauth_codex/compat")
 | `max_output_tokens` | support | 전달 + 양수 정수 검증 |
 | `metadata` | support | dict 검증 후 전달 |
 | `include` | support | `list[str]` 검증 후 전달 |
+| `previous_response_id` | support | Codex profile에서는 서버 전달 대신 로컬 연속성 에뮬레이션 (미존재 시 `not_found`) |
 | `max_tool_calls` | support | 전달 + 양수 정수 검증 |
 | `parallel_tool_calls` | support | 전달 + bool 검증 |
 | `truncation` | support | 전달 + `auto`/`disabled` 검증 |

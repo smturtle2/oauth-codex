@@ -9,6 +9,9 @@
   - request 옵션: `extra_headers`, `extra_query`, `extra_body`
 - 요청 헤더 보호 정책 추가
   - `Authorization`, `ChatGPT-Account-ID`, `Content-Type`는 `extra_headers`로 override 불가
+- Codex profile `previous_response_id` 내부 연속성 에뮬레이션
+  - backend 미지원 필드를 서버로 전달하지 않고 로컬 저장소(`responses/index.json`) 기반으로 체인 복원
+  - 미존재 `previous_response_id`는 `SDKRequestError(status_code=404, provider_code="not_found")`로 반환
 
 ## 0.5.0
 

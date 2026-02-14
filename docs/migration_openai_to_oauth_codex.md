@@ -60,6 +60,7 @@ client = AsyncOAuthCodexClient()
 - `store=True` + Codex OAuth profile: 기본 `auto_disable` 정책으로 `store=False` 전환
 - `service_tier`: 기본 ignore+warn
 - `validation_mode`: `warn`(기본), `error`, `ignore`
+- `previous_response_id`: Codex OAuth profile에서는 로컬 연속성 저장소로 내부 에뮬레이션
 - `max_tool_calls`: support (양수 정수 검증)
 - `parallel_tool_calls`: support (bool 검증)
 - `truncation`: support (`auto`/`disabled` 검증)
@@ -71,6 +72,7 @@ Codex profile에서 backend 미지원 기능은 SDK 내부에서 자동 보완�
 
 - `files.create` -> 로컬 영속 저장소로 처리
 - `vector_stores.*` -> 로컬 영속 저장소로 처리
+- `previous_response_id` -> 로컬 `responses/index.json` 기반 연속성 복원/검증
 - `validate_model=True` -> 로컬 모델명 검증(non-empty string)
 - 저장 경로 우선순위
   - `compat_storage_dir` 인자

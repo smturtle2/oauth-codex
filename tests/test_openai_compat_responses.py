@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from conftest import InMemoryTokenStore
-from oauth_codex import ContinuityError, OAuthCodexClient
+from oauth_codex import AsyncOAuthCodexClient, ContinuityError, OAuthCodexClient, SDKRequestError
 from oauth_codex.types import OAuthTokens, StreamEvent
 
 
@@ -110,3 +110,298 @@ def test_responses_create_structured_output_payload(monkeypatch: pytest.MonkeyPa
     assert captured["extra_headers"] == {"X-OpenAI-Compat": "1"}
     assert captured["extra_query"] == {"source": "test"}
     assert response.output_text == "ok"
+
+
+def test_codex_previous_response_id_local_continuity_non_stream(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    client = OAuthCodexClient(
+        token_store=InMemoryTokenStore(
+            OAuthTokens(access_token="a", refresh_token="r", expires_at=9_999_999_999)
+        ),
+        compat_storage_dir=str(tmp_path),
+    )
+    captured_payloads: list[dict[str, object]] = []
+
+    def fake_sse(**kwargs):
+        payload = kwargs["payload"]
+        assert isinstance(payload, dict)
+        captured_payloads.append(
+            {
+                **payload,
+                "input": [dict(item) for item in payload.get("input", []) if isinstance(item, dict)],
+            }
+        )
+        idx = len(captured_payloads)
+        response_id = f"resp_{idx}"
+        text = "first" if idx == 1 else "second"
+        output_item = {
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": text}],
+        }
+        yield StreamEvent(type="response_started", response_id=response_id)
+        yield StreamEvent(type="text_delta", delta=text, response_id=response_id)
+        yield StreamEvent(
+            type="response_completed",
+            response_id=response_id,
+            raw={"id": response_id, "output": [output_item]},
+        )
+        yield StreamEvent(type="done", response_id=response_id)
+
+    monkeypatch.setattr(client._engine, "_stream_sse_sync", fake_sse)
+
+    first = client.responses.create(model="gpt-5.3-codex", input="hi")
+    second = client.responses.create(
+        model="gpt-5.3-codex",
+        input="next",
+        previous_response_id=first.id,
+    )
+
+    assert second.id == "resp_2"
+    assert "previous_response_id" not in captured_payloads[1]
+    second_input = captured_payloads[1]["input"]
+    assert isinstance(second_input, list)
+    assert second_input[0]["role"] == "user"
+    assert second_input[0]["content"] == "hi"
+    assert second_input[1]["type"] == "message"
+    assert second_input[2]["role"] == "user"
+    assert second_input[2]["content"] == "next"
+    assert (tmp_path / "responses" / "index.json").exists()
+
+
+def test_codex_previous_response_id_missing_returns_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    client = OAuthCodexClient(
+        token_store=InMemoryTokenStore(
+            OAuthTokens(access_token="a", refresh_token="r", expires_at=9_999_999_999)
+        ),
+        compat_storage_dir=str(tmp_path),
+    )
+
+    def fail_sse(**kwargs):
+        _ = kwargs
+        raise AssertionError("backend request should not be attempted when previous_response_id is missing")
+
+    monkeypatch.setattr(client._engine, "_stream_sse_sync", fail_sse)
+
+    with pytest.raises(SDKRequestError) as exc:
+        client.responses.create(
+            model="gpt-5.3-codex",
+            input="follow-up",
+            previous_response_id="resp_missing",
+        )
+
+    assert exc.value.status_code == 404
+    assert exc.value.provider_code == "not_found"
+
+
+def test_codex_previous_response_id_local_continuity_stream_raw_events(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    client = OAuthCodexClient(
+        token_store=InMemoryTokenStore(
+            OAuthTokens(access_token="a", refresh_token="r", expires_at=9_999_999_999)
+        ),
+        compat_storage_dir=str(tmp_path),
+    )
+    captured_payloads: list[dict[str, object]] = []
+
+    def fake_sse(**kwargs):
+        payload = kwargs["payload"]
+        assert isinstance(payload, dict)
+        captured_payloads.append(
+            {
+                **payload,
+                "input": [dict(item) for item in payload.get("input", []) if isinstance(item, dict)],
+            }
+        )
+        idx = len(captured_payloads)
+        response_id = f"resp_{idx}"
+        text = f"stream-{idx}"
+        output_item = {
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": text}],
+        }
+        yield StreamEvent(type="response_started", response_id=response_id)
+        yield StreamEvent(type="text_delta", delta=text, response_id=response_id)
+        yield StreamEvent(
+            type="response_completed",
+            response_id=response_id,
+            raw={"id": response_id, "output": [output_item]},
+        )
+        yield StreamEvent(type="done", response_id=response_id)
+
+    monkeypatch.setattr(client._engine, "_stream_sse_sync", fake_sse)
+
+    first_events = list(client.responses.create(model="gpt-5.3-codex", input="hi", stream=True))
+    second_events = list(
+        client.responses.create(
+            model="gpt-5.3-codex",
+            input="later",
+            previous_response_id="resp_1",
+            stream=True,
+        )
+    )
+
+    assert first_events[-1].type == "done"
+    assert second_events[-1].type == "done"
+    assert "previous_response_id" not in captured_payloads[1]
+    second_input = captured_payloads[1]["input"]
+    assert isinstance(second_input, list)
+    assert second_input[0]["content"] == "hi"
+    assert second_input[1]["type"] == "message"
+    assert second_input[2]["content"] == "later"
+
+
+def test_codex_previous_response_id_local_continuity_text_stream(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    client = OAuthCodexClient(
+        token_store=InMemoryTokenStore(
+            OAuthTokens(access_token="a", refresh_token="r", expires_at=9_999_999_999)
+        ),
+        compat_storage_dir=str(tmp_path),
+    )
+    captured_payloads: list[dict[str, object]] = []
+
+    def fake_sse(**kwargs):
+        payload = kwargs["payload"]
+        assert isinstance(payload, dict)
+        captured_payloads.append(
+            {
+                **payload,
+                "input": [dict(item) for item in payload.get("input", []) if isinstance(item, dict)],
+            }
+        )
+        idx = len(captured_payloads)
+        response_id = f"resp_{idx}"
+        text = f"text-{idx}"
+        output_item = {
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": text}],
+        }
+        yield StreamEvent(type="response_started", response_id=response_id)
+        yield StreamEvent(type="text_delta", delta=text, response_id=response_id)
+        yield StreamEvent(
+            type="response_completed",
+            response_id=response_id,
+            raw={"id": response_id, "output": [output_item]},
+        )
+        yield StreamEvent(type="done", response_id=response_id)
+
+    monkeypatch.setattr(client._engine, "_stream_sse_sync", fake_sse)
+
+    out1 = "".join(client.generate_stream(model="gpt-5.3-codex", prompt="hello"))
+    out2 = "".join(
+        client.generate_stream(
+            model="gpt-5.3-codex",
+            prompt="world",
+            previous_response_id="resp_1",
+        )
+    )
+
+    assert out1 == "text-1"
+    assert out2 == "text-2"
+    assert "previous_response_id" not in captured_payloads[1]
+    second_input = captured_payloads[1]["input"]
+    assert isinstance(second_input, list)
+    assert second_input[0]["content"] == "hello"
+    assert second_input[1]["type"] == "message"
+    assert second_input[2]["content"] == "world"
+
+
+def test_non_codex_profile_preserves_previous_response_id_passthrough(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = OAuthCodexClient(
+        token_store=InMemoryTokenStore(
+            OAuthTokens(access_token="a", refresh_token="r", expires_at=9_999_999_999)
+        ),
+        chatgpt_base_url="https://api.example.com/v1",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_sse(**kwargs):
+        captured["payload"] = kwargs["payload"]
+        yield StreamEvent(type="response_started", response_id="resp_1")
+        yield StreamEvent(type="text_delta", delta="ok", response_id="resp_1")
+        yield StreamEvent(type="response_completed", response_id="resp_1")
+        yield StreamEvent(type="done", response_id="resp_1")
+
+    monkeypatch.setattr(client._engine, "_stream_sse_sync", fake_sse)
+
+    client.responses.create(
+        model="gpt-5.3-codex",
+        input="hi",
+        previous_response_id="resp_prev",
+    )
+
+    payload = captured["payload"]
+    assert isinstance(payload, dict)
+    assert payload["previous_response_id"] == "resp_prev"
+
+
+@pytest.mark.asyncio
+async def test_codex_previous_response_id_local_continuity_non_stream_async(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    client = AsyncOAuthCodexClient(
+        token_store=InMemoryTokenStore(
+            OAuthTokens(access_token="a", refresh_token="r", expires_at=9_999_999_999)
+        ),
+        compat_storage_dir=str(tmp_path),
+    )
+    captured_payloads: list[dict[str, object]] = []
+
+    async def fake_sse(**kwargs):
+        payload = kwargs["payload"]
+        assert isinstance(payload, dict)
+        captured_payloads.append(
+            {
+                **payload,
+                "input": [dict(item) for item in payload.get("input", []) if isinstance(item, dict)],
+            }
+        )
+        idx = len(captured_payloads)
+        response_id = f"resp_{idx}"
+        text = f"async-{idx}"
+        output_item = {
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": text}],
+        }
+        yield StreamEvent(type="response_started", response_id=response_id)
+        yield StreamEvent(type="text_delta", delta=text, response_id=response_id)
+        yield StreamEvent(
+            type="response_completed",
+            response_id=response_id,
+            raw={"id": response_id, "output": [output_item]},
+        )
+        yield StreamEvent(type="done", response_id=response_id)
+
+    monkeypatch.setattr(client._engine, "_stream_sse_async", fake_sse)
+
+    first = await client.responses.create(model="gpt-5.3-codex", input="hello")
+    second = await client.responses.create(
+        model="gpt-5.3-codex",
+        input="again",
+        previous_response_id=first.id,
+    )
+
+    assert first.id == "resp_1"
+    assert second.id == "resp_2"
+    assert "previous_response_id" not in captured_payloads[1]
+    merged_input = captured_payloads[1]["input"]
+    assert isinstance(merged_input, list)
+    assert merged_input[0]["content"] == "hello"
+    assert merged_input[1]["type"] == "message"
+    assert merged_input[2]["content"] == "again"

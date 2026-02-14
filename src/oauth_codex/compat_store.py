@@ -15,6 +15,7 @@ COMPAT_STORAGE_DIR_ENV = "CODEX_COMPAT_STORAGE_DIR"
 
 _FILES_INDEX_DEFAULT = {"object": "list", "data": []}
 _VECTOR_INDEX_DEFAULT = {"object": "list", "data": []}
+_RESPONSES_INDEX_DEFAULT = {"object": "list", "data": []}
 _TOKEN_PATTERN = re.compile(r"[a-z0-9_]+")
 
 
@@ -35,6 +36,8 @@ class LocalCompatStore:
         self.files_index_path = self.files_dir / "index.json"
         self.vector_stores_dir = self.base_dir / "vector_stores"
         self.vector_stores_index_path = self.vector_stores_dir / "index.json"
+        self.responses_dir = self.base_dir / "responses"
+        self.responses_index_path = self.responses_dir / "index.json"
 
     def create_file(
         self,
@@ -204,11 +207,70 @@ class LocalCompatStore:
         sliced = results[:max_num_results]
         return {"object": "list", "data": sliced, "has_more": len(results) > max_num_results}
 
+    def get_response_continuity(self, response_id: str) -> dict[str, Any]:
+        if not isinstance(response_id, str) or not response_id:
+            raise ValueError("response_id must be a non-empty string")
+        for item in self._load_responses_index()["data"]:
+            if item.get("id") == response_id:
+                return dict(item)
+        raise KeyError(f"response {response_id} not found")
+
+    def upsert_response_continuity(
+        self,
+        *,
+        response_id: str,
+        model: str,
+        continuation_input: list[dict[str, Any]],
+        previous_response_id: str | None,
+        created_at: int | None = None,
+    ) -> dict[str, Any]:
+        if not isinstance(response_id, str) or not response_id:
+            raise ValueError("response_id must be a non-empty string")
+        if not isinstance(model, str) or not model.strip():
+            raise ValueError("model must be a non-empty string")
+        if previous_response_id is not None and (
+            not isinstance(previous_response_id, str) or not previous_response_id
+        ):
+            raise ValueError("previous_response_id must be None or a non-empty string")
+        if not isinstance(continuation_input, list):
+            raise ValueError("continuation_input must be a list of dictionaries")
+        normalized_input: list[dict[str, Any]] = []
+        for item in continuation_input:
+            if not isinstance(item, dict):
+                raise ValueError("continuation_input must be a list of dictionaries")
+            normalized_input.append(dict(item))
+
+        if created_at is None:
+            created_at = int(time.time())
+        if not isinstance(created_at, int):
+            raise ValueError("created_at must be an integer")
+
+        record = {
+            "id": response_id,
+            "object": "response",
+            "created_at": created_at,
+            "model": model,
+            "previous_response_id": previous_response_id,
+            "continuation_input": normalized_input,
+        }
+        index = self._load_responses_index()
+        for idx, item in enumerate(index["data"]):
+            if item.get("id") == response_id:
+                index["data"][idx] = record
+                break
+        else:
+            index["data"].append(record)
+        self._atomic_write_json(self.responses_index_path, index)
+        return dict(record)
+
     def _load_files_index(self) -> dict[str, Any]:
         return self._load_index(self.files_index_path, _FILES_INDEX_DEFAULT)
 
     def _load_vector_index(self) -> dict[str, Any]:
         return self._load_index(self.vector_stores_index_path, _VECTOR_INDEX_DEFAULT)
+
+    def _load_responses_index(self) -> dict[str, Any]:
+        return self._load_index(self.responses_index_path, _RESPONSES_INDEX_DEFAULT)
 
     def _load_index(self, path: Path, default_payload: dict[str, Any]) -> dict[str, Any]:
         if not path.exists():

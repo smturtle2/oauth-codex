@@ -7,7 +7,7 @@ import pytest
 
 from conftest import InMemoryTokenStore
 from oauth_codex import AsyncOAuthCodexClient, OAuthCodexClient, SDKRequestError
-from oauth_codex.types import OAuthTokens
+from oauth_codex.types import OAuthTokens, StreamEvent
 
 
 def _tokens() -> OAuthTokens:
@@ -115,3 +115,73 @@ async def test_local_compat_sync_async_shape_parity(tmp_path) -> None:
     assert async_result["data"]
     assert set(sync_result["data"][0].keys()) == set(async_result["data"][0].keys())
     assert async_result["data"][0]["file_id"] == file_out["id"]
+
+
+def test_local_compat_response_continuity_persists_between_clients(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    first = OAuthCodexClient(
+        token_store=InMemoryTokenStore(_tokens()),
+        compat_storage_dir=str(tmp_path),
+    )
+
+    def first_sse(**kwargs):
+        _ = kwargs
+        yield StreamEvent(type="response_started", response_id="resp_1")
+        yield StreamEvent(type="text_delta", delta="first", response_id="resp_1")
+        yield StreamEvent(
+            type="response_completed",
+            response_id="resp_1",
+            raw={
+                "id": "resp_1",
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": "first"}],
+                    }
+                ],
+            },
+        )
+        yield StreamEvent(type="done", response_id="resp_1")
+
+    monkeypatch.setattr(first._engine, "_stream_sse_sync", first_sse)
+
+    first_resp = first.responses.create(model="gpt-5.3-codex", input="seed")
+    assert first_resp.id == "resp_1"
+
+    second = OAuthCodexClient(
+        token_store=InMemoryTokenStore(_tokens()),
+        compat_storage_dir=str(tmp_path),
+    )
+    captured: dict[str, object] = {}
+
+    def second_sse(**kwargs):
+        payload = kwargs["payload"]
+        assert isinstance(payload, dict)
+        captured["payload"] = {
+            **payload,
+            "input": [dict(item) for item in payload.get("input", []) if isinstance(item, dict)],
+        }
+        yield StreamEvent(type="response_started", response_id="resp_2")
+        yield StreamEvent(type="text_delta", delta="second", response_id="resp_2")
+        yield StreamEvent(type="response_completed", response_id="resp_2")
+        yield StreamEvent(type="done", response_id="resp_2")
+
+    monkeypatch.setattr(second._engine, "_stream_sse_sync", second_sse)
+
+    second.responses.create(
+        model="gpt-5.3-codex",
+        input="next",
+        previous_response_id=first_resp.id,
+    )
+
+    payload = captured["payload"]
+    assert isinstance(payload, dict)
+    assert "previous_response_id" not in payload
+    merged_input = payload["input"]
+    assert isinstance(merged_input, list)
+    assert merged_input[0]["content"] == "seed"
+    assert merged_input[1]["type"] == "message"
+    assert merged_input[2]["content"] == "next"
