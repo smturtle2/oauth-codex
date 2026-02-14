@@ -45,22 +45,23 @@ async def test_agenerate_passes_responses_request_options(
 
     monkeypatch.setattr(llm, "_stream_sse_async", fake_stream_sse_async)
 
-    text = await llm.agenerate(
-        model="gpt-5.3-codex",
-        prompt="hi",
-        tools=[{"type": "function", "name": "get_weather", "parameters": {"type": "object"}}],
-        response_format={"type": "json_object"},
-        tool_choice="required",
-        strict_output=True,
-        store=True,
-        reasoning={"effort": "medium"},
-    )
+    with pytest.warns(RuntimeWarning):
+        text = await llm.agenerate(
+            model="gpt-5.3-codex",
+            prompt="hi",
+            tools=[{"type": "function", "name": "get_weather", "parameters": {"type": "object"}}],
+            response_format={"type": "json_object"},
+            tool_choice="required",
+            strict_output=True,
+            store=True,
+            reasoning={"effort": "medium"},
+        )
 
     assert text == "ok"
 
     payload = captured["payload"]
     assert isinstance(payload, dict)
-    assert payload["store"] is True
+    assert payload["store"] is False
     assert payload["tool_choice"] == "required"
     assert payload["reasoning"] == {"effort": "medium"}
     assert payload["text"] == {"format": {"type": "json_object"}}

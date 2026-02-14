@@ -132,18 +132,17 @@ def _test_strict_output(llm: Any, model: str) -> bool:
         return False
 
 
-def _test_store_rejection(llm: Any, model: str) -> bool:
-    label = "store=True behavior"
+def _test_store_auto_disable(llm: Any, model: str) -> bool:
+    label = "store=True auto-disable behavior"
     try:
-        llm.generate(model=model, prompt="Say OK", store=True)
-        _fail(label, "unexpected success; backend currently rejects store=True")
-        return False
+        result = llm.generate(model=model, prompt="Say OK", store=True, return_details=True)
+        if not isinstance(result.text, str) or not result.text.strip():
+            _fail(label, "empty response")
+            return False
+        _ok(label, "request succeeded (SDK handled store policy)")
+        return True
     except Exception as exc:
-        message = str(exc)
-        if "Store must be set to false" in message:
-            _ok(label, "backend rejected store=True as expected")
-            return True
-        _fail(label, f"unexpected error: {message}")
+        _fail(label, f"unexpected error: {exc}")
         return False
 
 
@@ -157,7 +156,7 @@ def main() -> int:
         _test_response_format_and_reasoning(llm, args.model),
         _test_tool_choice_required(llm, args.model),
         _test_strict_output(llm, args.model),
-        _test_store_rejection(llm, args.model),
+        _test_store_auto_disable(llm, args.model),
     ]
     passed = sum(1 for ok in checks if ok)
     total = len(checks)

@@ -132,22 +132,23 @@ def test_generate_passes_responses_request_options(
 
     monkeypatch.setattr(llm, "_stream_sse_sync", fake_stream_sse_sync)
 
-    text = llm.generate(
-        model="gpt-5.3-codex",
-        prompt="hi",
-        tools=[{"type": "function", "name": "get_weather", "parameters": {"type": "object"}}],
-        response_format={"type": "json_object"},
-        tool_choice={"type": "function", "name": "get_weather"},
-        strict_output=True,
-        store=True,
-        reasoning={"effort": "high"},
-    )
+    with pytest.warns(RuntimeWarning):
+        text = llm.generate(
+            model="gpt-5.3-codex",
+            prompt="hi",
+            tools=[{"type": "function", "name": "get_weather", "parameters": {"type": "object"}}],
+            response_format={"type": "json_object"},
+            tool_choice={"type": "function", "name": "get_weather"},
+            strict_output=True,
+            store=True,
+            reasoning={"effort": "high"},
+        )
 
     assert text == "ok"
 
     payload = captured["payload"]
     assert isinstance(payload, dict)
-    assert payload["store"] is True
+    assert payload["store"] is False
     assert payload["tool_choice"] == {"type": "function", "name": "get_weather"}
     assert payload["reasoning"] == {"effort": "high"}
     assert payload["text"] == {"format": {"type": "json_object"}}

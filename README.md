@@ -1,14 +1,42 @@
 # oauth-codex
 
-Lightweight Python SDK for using the ChatGPT Codex backend with OAuth PKCE.
+OAuth PKCE 기반 Codex SDK with OpenAI-compatible surface.
+
+## What's New (0.4.0)
+
+- OpenAI-style 표면을 코어 클라이언트에 직접 통합
+  - `OAuthCodexClient.responses.create(...)`
+  - `OAuthCodexClient.responses.input_tokens.count(...)`
+  - `OAuthCodexClient.files.create(...)`
+  - `OAuthCodexClient.vector_stores.*`
+  - `OAuthCodexClient.models.capabilities(...)`
+- 기존 `CodexOAuthLLM` API는 하위호환 alias로 유지
+- `validation_mode` (`warn`/`error`/`ignore`) + 파라미터 검증기 추가
+- `store_behavior` (`auto_disable`/`error`/`passthrough`) 추가
+- 표준 에러 모델(`SDKRequestError`) 및 토큰 저장소 read/write/delete 분리 예외 추가
+- reasoning/tool-call 스트리밍 이벤트 스키마 v1 고정
+- 재시도 기본 정책 추가
+  - `401`: refresh 후 재시도
+  - `429/5xx`: 지수 백오프 + jitter
+- 관측성 훅 추가
+  - `on_request_start`, `on_request_end`, `on_auth_refresh`, `on_error`
 
 ## Highlights
 
-- OAuth login + token refresh
-- Keyring-first token storage with file fallback
-- Sync/async text generation and streaming
-- Manual function-calling workflow
-- Direct requests to `https://chatgpt.com/backend-api/codex/responses`
+- `CodexOAuthLLM` legacy API 유지 (`generate/agenerate/generate_stream/agenerate_stream`)
+- OpenAI-compatible client 추가
+  - `OAuthCodexClient.responses.create(...)`
+  - `OAuthCodexClient.responses.input_tokens.count(...)`
+  - `OAuthCodexClient.files.create(...)`
+  - `OAuthCodexClient.vector_stores.*`
+- Sync/async 옵션/이벤트/에러 동등성 강화
+- OAuth 토큰 수명 API
+  - `is_authenticated()`
+  - `is_expired()`
+  - `refresh_if_needed()`
+- 표준 에러 모델 + 재시도 정책(401 refresh, 429/5xx backoff)
+- 관측성 훅
+  - `on_request_start`, `on_request_end`, `on_auth_refresh`, `on_error`
 
 ## Requirements
 
@@ -26,130 +54,123 @@ For local development:
 python3 -m pip install -e ".[dev]"
 ```
 
-## Quick Start
+## Quick Start (Legacy)
 
 ```python
 from oauth_codex import CodexOAuthLLM
 
 llm = CodexOAuthLLM()
-
-text = llm.generate(
-    model="gpt-5.3-codex",
-    prompt="Explain OAuth PKCE in 3 bullets.",
-)
+text = llm.generate(model="gpt-5.3-codex", prompt="Explain OAuth PKCE in 3 bullets.")
 print(text)
 ```
 
-On first use, the SDK prints an OAuth URL. Complete sign-in in your browser, then paste the localhost callback URL.
-
-## Request Options
-
-`generate` / `agenerate` / `generate_stream` / `agenerate_stream` support:
-
-- `response_format` -> sent as `text.format`
-- `tool_choice` -> sent as-is
-- `strict_output=True` -> adds `"strict": true` to each function tool
-- `reasoning` -> sent as-is
-- `store` -> sent as-is
-
-Example:
+## Quick Start (OpenAI-compatible)
 
 ```python
-result = llm.generate(
+from oauth_codex import OAuthCodexClient
+
+client = OAuthCodexClient()
+
+response = client.responses.create(
     model="gpt-5.3-codex",
-    prompt="Return valid JSON with title and summary",
+    input="Return JSON with keys: ok, source",
     response_format={"type": "json_object"},
-    tool_choice="required",
-    strict_output=True,
-    reasoning={"effort": "high"},
-    store=False,
-    return_details=True,
-)
-```
-
-Note: the current codex backend rejects `store=True` with `HTTP 400: Store must be set to false`.
-
-## Streaming
-
-```python
-for chunk in llm.generate_stream(
-    model="gpt-5.3-codex",
-    prompt="Write one short paragraph about PKCE.",
-):
-    print(chunk, end="", flush=True)
-```
-
-## Async
-
-```python
-import asyncio
-from oauth_codex import CodexOAuthLLM
-
-
-async def main() -> None:
-    llm = CodexOAuthLLM()
-    text = await llm.agenerate(
-        model="gpt-5.3-codex",
-        prompt="Summarize OAuth in 2 lines.",
-    )
-    print(text)
-
-
-asyncio.run(main())
-```
-
-## Manual Function Calling
-
-When tools are requested:
-
-- `return_details=False` raises `ToolCallRequiredError`
-- `return_details=True` returns tool calls in `GenerateResult`
-
-```python
-from oauth_codex import CodexOAuthLLM
-
-
-def get_weather(city: str) -> str:
-    return f"Sunny in {city}"
-
-
-llm = CodexOAuthLLM()
-result = llm.generate(
-    model="gpt-5.3-codex",
-    messages=[{"role": "user", "content": "What is the weather in Seoul?"}],
-    tools=[get_weather],
-    return_details=True,
+    reasoning={"effort": "high", "summary": "auto"},
 )
 
-if result.finish_reason == "tool_calls":
-    tool_results = [
-        {
-            "tool_call_id": result.tool_calls[0].id,
-            "name": result.tool_calls[0].name,
-            "output": get_weather((result.tool_calls[0].arguments or {}).get("city", "Seoul")),
-        }
-    ]
-    final = llm.generate(
-        model="gpt-5.3-codex",
-        messages=[{"role": "user", "content": "What is the weather in Seoul?"}],
-        tools=[get_weather],
-        tool_results=tool_results,
-        return_details=True,
-    )
-    print(final.text)
+print(response.id)
+print(response.output_text)
+print(response.usage)
 ```
 
-For tool-enabled streaming, set `raw_events=True` and consume `StreamEvent` objects.
+## OpenAI Compatibility Surface
+
+- `OAuthCodexClient.responses.create(...)`
+- `OAuthCodexClient.responses.input_tokens.count(...)`
+- `OAuthCodexClient.files.create(...)`
+- `OAuthCodexClient.vector_stores.create/retrieve/list/update/delete/search(...)`
+- `OAuthCodexClient.models.capabilities(model)`
+
+`AsyncOAuthCodexClient`에서 동일 리소스를 async로 제공합니다.
+
+## Parameter Policy (Code + Docs)
+
+| Parameter | Default Policy | Notes |
+|---|---|---|
+| `temperature` | support | 전달 + 타입/범위 검증 |
+| `top_p` | support | 전달 + 타입/범위 검증 |
+| `max_output_tokens` | support | 전달 + 양수 정수 검증 |
+| `metadata` | support | dict 검증 후 전달 |
+| `include` | support | `list[str]` 검증 후 전달 |
+| `service_tier` | ignore+warn | `validation_mode="error"`일 때 예외 |
+| `store` | auto-disable | Codex OAuth profile에서 `True`면 `False`로 보정 + 경고 |
+
+Validation mode:
+
+- `warn` (default)
+- `error`
+- `ignore`
+
+Store behavior:
+
+- `auto_disable` (default)
+- `error`
+- `passthrough`
+
+## Streaming Event Schema
+
+이벤트 타입은 `schema_version="v1"` 기준으로 고정됩니다.
+
+- `response_started`
+- `text_delta`
+- `reasoning_delta`
+- `reasoning_done`
+- `tool_call_started`
+- `tool_call_arguments_delta`
+- `tool_call_done`
+- `usage`
+- `response_completed`
+- `error`
+
+자세한 스키마: `docs/stream_event_schema_v1.md`
+
+## Error Model
+
+`SDKRequestError` fields:
+
+- `status_code`
+- `provider_code`
+- `user_message`
+- `retryable`
+- `request_id`
+- `raw_error`
+
+Token store failures:
+
+- `TokenStoreReadError`
+- `TokenStoreWriteError`
+- `TokenStoreDeleteError`
+
+Unsupported profile actions:
+
+- `NotSupportedError`
+
+## Retry Policy
+
+Default:
+
+- `401`: refresh 후 1회 재시도
+- `429/5xx`: 지수 백오프 + jitter 재시도
 
 ## Authentication and Storage
 
-- If no valid token exists, login is triggered automatically
-- Storage priority:
-  - Keyring service: `oauth-codex`
-  - File fallback: `~/.oauth_codex/auth.json`
-- Legacy credentials are migrated from:
-  - Keyring service: `codex-oauth-llm`
-  - File path: `~/.codex_oauth_llm/auth.json`
+- 최초 인증이 없으면 OAuth 로그인 플로우 실행
+- 기본 저장 우선순위
+  - keyring: `oauth-codex`
+  - file fallback: `~/.oauth_codex/auth.json`
+- legacy migration
+  - keyring: `codex-oauth-llm`
+  - file: `~/.codex_oauth_llm/auth.json`
 
 ## Environment Variables
 
@@ -162,14 +183,11 @@ For tool-enabled streaming, set `raw_events=True` and consume `StreamEvent` obje
 - `CODEX_OAUTH_TOKEN_ENDPOINT`
 - `CODEX_OAUTH_ORIGINATOR`
 
-## Smoke Tests
+## Migration Guide
 
-Run from repository root after editable install:
+OpenAI SDK -> oauth-codex 대응표:
 
-```bash
-python3 examples/login_smoke_test.py --model gpt-5.3-codex --prompt "hello"
-python3 examples/request_options_smoke_test.py --model gpt-5.3-codex
-```
+- `docs/migration_openai_to_oauth_codex.md`
 
 ## Development
 
@@ -177,25 +195,3 @@ python3 examples/request_options_smoke_test.py --model gpt-5.3-codex
 python3 -m pip install -e ".[dev]"
 pytest -q
 ```
-
-## Release
-
-1. Bump `project.version` in `pyproject.toml`.
-2. Tag and push:
-
-```bash
-git tag v0.3.0
-git push origin main
-git push origin v0.3.0
-```
-
-3. Verify GitHub Actions publish and install:
-
-```bash
-pip install -U oauth-codex==0.3.0
-```
-
-## Notes
-
-- This SDK supports only `api_mode="responses"` for the codex backend.
-- `validate_model=True` is unsupported in codex-backend mode.
