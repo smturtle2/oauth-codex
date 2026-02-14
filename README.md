@@ -2,7 +2,7 @@
 
 OAuth PKCE 기반 Codex SDK with OpenAI-compatible surface.
 
-## What's New (0.4.0)
+## What's New (0.5.0)
 
 - OpenAI-style 표면을 코어 클라이언트에 직접 통합
   - `OAuthCodexClient.responses.create(...)`
@@ -20,6 +20,9 @@ OAuth PKCE 기반 Codex SDK with OpenAI-compatible surface.
   - `429/5xx`: 지수 백오프 + jitter
 - 관측성 훅 추가
   - `on_request_start`, `on_request_end`, `on_auth_refresh`, `on_error`
+- Codex profile 로컬 호환 백엔드 추가
+  - `files.create`, `vector_stores.*` 자동 로컬 폴백
+  - `validate_model=True` 시 로컬 모델명 검증
 
 ## Highlights
 
@@ -92,6 +95,23 @@ print(response.usage)
 - `OAuthCodexClient.models.capabilities(model)`
 
 `AsyncOAuthCodexClient`에서 동일 리소스를 async로 제공합니다.
+
+Codex profile(`https://chatgpt.com/backend-api/codex`)에서는 backend 미지원 기능을 라이브러리 내부에서 자동으로 보완합니다.
+
+- `files.create`, `vector_stores.*` -> 로컬 영속 저장소로 처리
+- `validate_model=True` -> 로컬 모델명(non-empty string) 검증
+- 저장 경로 우선순위
+  - `compat_storage_dir` 인자
+  - `CODEX_COMPAT_STORAGE_DIR`
+  - `~/.oauth_codex/compat` (기본)
+
+예시:
+
+```python
+from oauth_codex import OAuthCodexClient
+
+client = OAuthCodexClient(compat_storage_dir="~/.oauth_codex/compat")
+```
 
 ## Parameter Policy (Code + Docs)
 
@@ -182,6 +202,7 @@ Default:
 - `CODEX_OAUTH_AUTHORIZATION_ENDPOINT`
 - `CODEX_OAUTH_TOKEN_ENDPOINT`
 - `CODEX_OAUTH_ORIGINATOR`
+- `CODEX_COMPAT_STORAGE_DIR`
 
 ## Migration Guide
 

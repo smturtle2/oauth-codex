@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0
+
+### Added
+
+- Codex profile local compatibility backend
+  - `files.create` now auto-falls back to local persistent storage
+  - `vector_stores.create/retrieve/list/update/delete/search` now auto-fall back to local persistent storage
+- Local compatibility storage path configuration
+  - constructor arg: `compat_storage_dir`
+  - env var: `CODEX_COMPAT_STORAGE_DIR`
+
+### Changed
+
+- `validate_model=True` on codex profile now performs local validation (model must be non-empty string) instead of raising unsupported error.
+
 ## 0.4.0
 
 ### Added
