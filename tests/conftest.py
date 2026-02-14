@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from oauth_codex.types import OAuthConfig, OAuthTokens
+from oauth_codex.legacy_types import OAuthTokens
 
 
 class InMemoryTokenStore:
@@ -25,13 +25,8 @@ class InMemoryTokenStore:
 def valid_tokens() -> OAuthTokens:
     return OAuthTokens(
         access_token="access-1",
-        api_key="sk-test",
         refresh_token="refresh-1",
-        token_type="Bearer",
         expires_at=9_999_999_999,
+        token_type="Bearer",
+        account_id="acct-1",
     )
-
-
-@pytest.fixture
-def oauth_config() -> OAuthConfig:
-    return OAuthConfig(client_id="test-client")

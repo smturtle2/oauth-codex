@@ -5,7 +5,7 @@ import argparse
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Codex OAuth login + generation smoke test")
+    parser = argparse.ArgumentParser(description="Codex OAuth login + responses smoke test")
     parser.add_argument(
         "--model",
         default="gpt-5.3-codex",
@@ -19,54 +19,50 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--stream",
         action="store_true",
-        help="Use streaming output",
+        help="Use SSE streaming output",
+    )
+    parser.add_argument(
+        "--base-url",
+        default="https://chatgpt.com/backend-api/codex",
+        help="Backend base URL",
     )
     return parser
 
 
 def main() -> int:
-    from oauth_codex import AuthRequiredError, CodexOAuthLLM, ToolCallRequiredError
+    from oauth_codex import AuthRequiredError, OAuthCodexClient
 
     args = _build_parser().parse_args()
 
-    llm = CodexOAuthLLM()
+    client = OAuthCodexClient(base_url=args.base_url)
 
-    if llm.is_authenticated():
+    if client.is_authenticated():
         print("Already authenticated. Reusing saved credentials.")
     else:
         print("Not authenticated. Starting OAuth login flow...")
-        llm.login()
+        client.login()
 
-    print(f"Authenticated: {llm.is_authenticated()}")
-
+    print(f"Authenticated: {client.is_authenticated()}")
     print(f"Requesting response with model={args.model!r}...")
+
     try:
         if args.stream:
             print("----- stream begin -----")
-            for chunk in llm.generate_stream(
-                model=args.model,
-                prompt=args.prompt,
-            ):
-                print(chunk, end="", flush=True)
+            events = client.responses.create(model=args.model, input=args.prompt, stream=True)
+            for event in events:
+                if event.type == "text_delta" and event.delta:
+                    print(event.delta, end="", flush=True)
             print("\n----- stream end -----")
         else:
-            text = llm.generate(
-                model=args.model,
-                prompt=args.prompt,
-            )
+            response = client.responses.create(model=args.model, input=args.prompt)
             print("----- response -----")
-            print(text)
+            print(response.output_text)
             print("--------------------")
-    except ToolCallRequiredError as exc:
-        print("Model requested function/tool calling. This smoke test only prints text responses.")
-        print(f"tool_calls={len(exc.tool_calls)}")
-        for call in exc.tool_calls:
-            print(f"- id={call.id!r} name={call.name!r} args={call.arguments_json!r}")
-        return 2
     except AuthRequiredError as exc:
         print("Authentication flow requires user action.")
         print(str(exc))
         return 3
+
     return 0
 
 

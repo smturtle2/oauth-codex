@@ -1,4 +1,10 @@
 from __future__ import annotations
+"""Legacy internal engine.
+
+This module keeps the pre-1.0 request/auth/stream implementation and is used by
+the new OpenAI-style surface in `oauth_codex._client` as an internal runtime
+backend. External users should import from package root (`oauth_codex`) only.
+"""
 
 import asyncio
 import json
@@ -11,7 +17,7 @@ from typing import Any, AsyncIterator, Callable, Iterator, Literal
 
 import httpx
 
-from .auth import (
+from .legacy_auth import (
     build_authorize_url,
     discover_endpoints,
     discover_endpoints_async,
@@ -40,7 +46,7 @@ from .errors import (
 )
 from .store import FallbackTokenStore
 from .tooling import normalize_tool_inputs, to_responses_tools, tool_results_to_response_items
-from .types import (
+from .legacy_types import (
     GenerateResult,
     InputTokensCountResult,
     Message,
@@ -3277,9 +3283,6 @@ class _AsyncModelsResource:
 
     async def capabilities(self, model: str) -> ModelCapabilities:
         return self._engine.model_capabilities(model)
-
-
-CodexOAuthLLM = OAuthCodexClient
 
 
 class AsyncOAuthCodexClient:

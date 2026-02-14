@@ -5,7 +5,7 @@ import json
 from types import UnionType
 from typing import Any, get_args, get_origin
 
-from .types import ToolInput, ToolResult, ToolSchema
+from .legacy_types import ToolInput, ToolResult, ToolSchema
 
 
 def _python_type_to_schema(annotation: Any) -> dict[str, Any]:

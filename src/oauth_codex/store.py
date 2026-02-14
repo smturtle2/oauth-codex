@@ -8,7 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .types import OAuthTokens, TokenStore
+from .legacy_types import OAuthTokens, TokenStore
 
 DEFAULT_FILE_PATH = Path.home() / ".oauth_codex" / "auth.json"
 LEGACY_FILE_PATH = Path.home() / ".codex_oauth_llm" / "auth.json"
