@@ -2,27 +2,15 @@
 
 OAuth PKCE 기반 Codex SDK with OpenAI-compatible surface.
 
-## What's New (0.5.0)
+## What's New (0.6.0)
 
-- OpenAI-style 표면을 코어 클라이언트에 직접 통합
-  - `OAuthCodexClient.responses.create(...)`
-  - `OAuthCodexClient.responses.input_tokens.count(...)`
-  - `OAuthCodexClient.files.create(...)`
-  - `OAuthCodexClient.vector_stores.*`
-  - `OAuthCodexClient.models.capabilities(...)`
-- 기존 `CodexOAuthLLM` API는 하위호환 alias로 유지
-- `validation_mode` (`warn`/`error`/`ignore`) + 파라미터 검증기 추가
-- `store_behavior` (`auto_disable`/`error`/`passthrough`) 추가
-- 표준 에러 모델(`SDKRequestError`) 및 토큰 저장소 read/write/delete 분리 예외 추가
-- reasoning/tool-call 스트리밍 이벤트 스키마 v1 고정
-- 재시도 기본 정책 추가
-  - `401`: refresh 후 재시도
-  - `429/5xx`: 지수 백오프 + jitter
-- 관측성 훅 추가
-  - `on_request_start`, `on_request_end`, `on_auth_refresh`, `on_error`
-- Codex profile 로컬 호환 백엔드 추가
-  - `files.create`, `vector_stores.*` 자동 로컬 폴백
-  - `validate_model=True` 시 로컬 모델명 검증
+- OpenAI-compatible Responses 요청 옵션 확장
+  - body 옵션: `max_tool_calls`, `parallel_tool_calls`, `truncation`
+  - request 옵션: `extra_headers`, `extra_query`, `extra_body`
+- 신규 옵션을 기존 `validation_mode` (`warn`/`error`/`ignore`) 정책에 통합
+- 보호 헤더 정책 추가
+  - `Authorization`, `ChatGPT-Account-ID`, `Content-Type`는 `extra_headers`로 override 불가
+- 기존 `0.5.x` OpenAI-compatible 표면 및 legacy API 하위호환 유지
 
 ## Highlights
 
@@ -122,8 +110,20 @@ client = OAuthCodexClient(compat_storage_dir="~/.oauth_codex/compat")
 | `max_output_tokens` | support | 전달 + 양수 정수 검증 |
 | `metadata` | support | dict 검증 후 전달 |
 | `include` | support | `list[str]` 검증 후 전달 |
+| `max_tool_calls` | support | 전달 + 양수 정수 검증 |
+| `parallel_tool_calls` | support | 전달 + bool 검증 |
+| `truncation` | support | 전달 + `auto`/`disabled` 검증 |
+| `extra_headers` | support | 요청 헤더 병합 (`Authorization`/`ChatGPT-Account-ID`/`Content-Type` 보호) |
+| `extra_query` | support | 요청 querystring 병합 |
+| `extra_body` | support | payload 마지막 merge로 기존 필드 override 허용 |
 | `service_tier` | ignore+warn | `validation_mode="error"`일 때 예외 |
 | `store` | auto-disable | Codex OAuth profile에서 `True`면 `False`로 보정 + 경고 |
+
+Protected headers:
+
+- `Authorization`
+- `ChatGPT-Account-ID`
+- `Content-Type`
 
 Validation mode:
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+
+### Added
+
+- OpenAI-style Responses 옵션 지원 확장
+  - body 옵션: `max_tool_calls`, `parallel_tool_calls`, `truncation`
+  - request 옵션: `extra_headers`, `extra_query`, `extra_body`
+- 요청 헤더 보호 정책 추가
+  - `Authorization`, `ChatGPT-Account-ID`, `Content-Type`는 `extra_headers`로 override 불가
+
 ## 0.5.0
 
 ### Added
