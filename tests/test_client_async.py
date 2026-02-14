@@ -39,6 +39,8 @@ async def test_agenerate_passes_responses_request_options(
 
     async def fake_stream_sse_async(**kwargs):
         captured["payload"] = kwargs["payload"]
+        captured["extra_headers"] = kwargs.get("extra_headers")
+        captured["extra_query"] = kwargs.get("extra_query")
         yield StreamEvent(type="text_delta", delta="ok")
         yield StreamEvent(type="done")
 
@@ -54,6 +56,16 @@ async def test_agenerate_passes_responses_request_options(
             strict_output=True,
             store=True,
             reasoning={"effort": "medium"},
+            max_output_tokens=9,
+            max_tool_calls=3,
+            parallel_tool_calls=True,
+            truncation="disabled",
+            extra_headers={
+                "ChatGPT-Account-ID": "override-should-fail",
+                "X-Async-Header": "ok",
+            },
+            extra_query={"trace_id": "xyz"},
+            extra_body={"max_output_tokens": 66, "custom_payload": True},
         )
 
     assert text == "ok"
@@ -65,6 +77,13 @@ async def test_agenerate_passes_responses_request_options(
     assert payload["reasoning"] == {"effort": "medium"}
     assert payload["text"] == {"format": {"type": "json_object"}}
     assert payload["tools"][0]["strict"] is True
+    assert payload["max_output_tokens"] == 66
+    assert payload["max_tool_calls"] == 3
+    assert payload["parallel_tool_calls"] is True
+    assert payload["truncation"] == "disabled"
+    assert payload["custom_payload"] is True
+    assert captured["extra_headers"] == {"X-Async-Header": "ok"}
+    assert captured["extra_query"] == {"trace_id": "xyz"}
 
 
 @pytest.mark.asyncio

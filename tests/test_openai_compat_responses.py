@@ -77,6 +77,8 @@ def test_responses_create_structured_output_payload(monkeypatch: pytest.MonkeyPa
 
     def fake_sse(**kwargs):
         captured["payload"] = kwargs["payload"]
+        captured["extra_headers"] = kwargs.get("extra_headers")
+        captured["extra_query"] = kwargs.get("extra_query")
         yield StreamEvent(type="text_delta", delta="ok")
         yield StreamEvent(type="done")
 
@@ -88,10 +90,23 @@ def test_responses_create_structured_output_payload(monkeypatch: pytest.MonkeyPa
         tools=[{"type": "function", "name": "x", "parameters": {"type": "object"}}],
         response_format={"type": "json_object"},
         strict_output=True,
+        max_tool_calls=4,
+        parallel_tool_calls=False,
+        truncation="auto",
+        extra_headers={"X-OpenAI-Compat": "1"},
+        extra_query={"source": "test"},
+        extra_body={"tool_choice": "required", "custom_payload": "yes"},
     )
 
     payload = captured["payload"]
     assert isinstance(payload, dict)
     assert payload["text"] == {"format": {"type": "json_object"}}
     assert payload["tools"][0]["strict"] is True
+    assert payload["max_tool_calls"] == 4
+    assert payload["parallel_tool_calls"] is False
+    assert payload["truncation"] == "auto"
+    assert payload["tool_choice"] == "required"
+    assert payload["custom_payload"] == "yes"
+    assert captured["extra_headers"] == {"X-OpenAI-Compat": "1"}
+    assert captured["extra_query"] == {"source": "test"}
     assert response.output_text == "ok"

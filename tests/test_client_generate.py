@@ -128,6 +128,8 @@ def test_generate_passes_responses_request_options(
 
     def fake_stream_sse_sync(**kwargs):
         captured["payload"] = kwargs["payload"]
+        captured["extra_headers"] = kwargs.get("extra_headers")
+        captured["extra_query"] = kwargs.get("extra_query")
         return _text_stream("ok")
 
     monkeypatch.setattr(llm, "_stream_sse_sync", fake_stream_sse_sync)
@@ -142,6 +144,16 @@ def test_generate_passes_responses_request_options(
             strict_output=True,
             store=True,
             reasoning={"effort": "high"},
+            max_output_tokens=8,
+            max_tool_calls=2,
+            parallel_tool_calls=False,
+            truncation="auto",
+            extra_headers={
+                "Authorization": "Bearer override-should-fail",
+                "X-Custom-Header": "ok",
+            },
+            extra_query={"trace_id": "abc"},
+            extra_body={"max_output_tokens": 77, "custom_payload": True},
         )
 
     assert text == "ok"
@@ -153,6 +165,13 @@ def test_generate_passes_responses_request_options(
     assert payload["reasoning"] == {"effort": "high"}
     assert payload["text"] == {"format": {"type": "json_object"}}
     assert payload["tools"][0]["strict"] is True
+    assert payload["max_output_tokens"] == 77
+    assert payload["max_tool_calls"] == 2
+    assert payload["parallel_tool_calls"] is False
+    assert payload["truncation"] == "auto"
+    assert payload["custom_payload"] is True
+    assert captured["extra_headers"] == {"X-Custom-Header": "ok"}
+    assert captured["extra_query"] == {"trace_id": "abc"}
 
 
 def test_generate_defaults_to_store_false(

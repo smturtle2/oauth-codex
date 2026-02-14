@@ -40,6 +40,10 @@ async def test_sync_async_payload_parity(monkeypatch: pytest.MonkeyPatch) -> Non
         max_output_tokens=256,
         metadata={"k": "v"},
         include=["reasoning"],
+        max_tool_calls=5,
+        parallel_tool_calls=False,
+        truncation="auto",
+        extra_body={"custom_payload": {"ok": True}},
     )
     await llm.agenerate(
         model="gpt-5.3-codex",
@@ -51,6 +55,10 @@ async def test_sync_async_payload_parity(monkeypatch: pytest.MonkeyPatch) -> Non
         max_output_tokens=256,
         metadata={"k": "v"},
         include=["reasoning"],
+        max_tool_calls=5,
+        parallel_tool_calls=False,
+        truncation="auto",
+        extra_body={"custom_payload": {"ok": True}},
     )
 
     assert captured["sync"] == captured["async"]

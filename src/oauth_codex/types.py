@@ -6,6 +6,7 @@ from typing import Any, Callable, Literal, Protocol, TypeAlias
 Message: TypeAlias = dict[str, Any]
 ValidationMode: TypeAlias = Literal["warn", "error", "ignore"]
 StoreBehavior: TypeAlias = Literal["auto_disable", "error", "passthrough"]
+TruncationMode: TypeAlias = Literal["auto", "disabled"]
 
 
 @dataclass

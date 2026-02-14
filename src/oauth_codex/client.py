@@ -52,6 +52,7 @@ from .types import (
     StreamEvent,
     TokenStore,
     TokenUsage,
+    TruncationMode,
     ValidationMode,
     ToolCall,
     ToolInput,
@@ -60,6 +61,8 @@ from .types import (
 
 
 class OAuthCodexClient:
+    _PROTECTED_REQUEST_HEADERS = frozenset({"authorization", "chatgpt-account-id", "content-type"})
+
     def __init__(
         self,
         *,
@@ -175,6 +178,12 @@ class OAuthCodexClient:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         validation_mode: ValidationMode | None = None,
         return_details: bool = False,
@@ -206,6 +215,12 @@ class OAuthCodexClient:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
             service_tier=service_tier,
             validation_mode=validation_mode,
         )
@@ -240,6 +255,12 @@ class OAuthCodexClient:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         validation_mode: ValidationMode | None = None,
         return_details: bool = False,
@@ -271,6 +292,12 @@ class OAuthCodexClient:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
             service_tier=service_tier,
             validation_mode=validation_mode,
         )
@@ -305,6 +332,12 @@ class OAuthCodexClient:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         validation_mode: ValidationMode | None = None,
         raw_events: bool = False,
@@ -339,6 +372,12 @@ class OAuthCodexClient:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
             service_tier=service_tier,
             validation_mode=validation_mode,
         )
@@ -366,6 +405,12 @@ class OAuthCodexClient:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         validation_mode: ValidationMode | None = None,
         raw_events: bool = False,
@@ -400,6 +445,12 @@ class OAuthCodexClient:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
             service_tier=service_tier,
             validation_mode=validation_mode,
         )
@@ -427,6 +478,12 @@ class OAuthCodexClient:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         stream: bool = False,
         validation_mode: ValidationMode | None = None,
@@ -455,6 +512,12 @@ class OAuthCodexClient:
                 max_output_tokens=max_output_tokens,
                 metadata=metadata,
                 include=include,
+                max_tool_calls=max_tool_calls,
+                parallel_tool_calls=parallel_tool_calls,
+                truncation=truncation,
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
                 service_tier=service_tier,
                 validation_mode=validation_mode,
             )
@@ -476,6 +539,12 @@ class OAuthCodexClient:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
             service_tier=service_tier,
             validation_mode=validation_mode,
         )
@@ -509,6 +578,12 @@ class OAuthCodexClient:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         stream: bool = False,
         validation_mode: ValidationMode | None = None,
@@ -537,6 +612,12 @@ class OAuthCodexClient:
                 max_output_tokens=max_output_tokens,
                 metadata=metadata,
                 include=include,
+                max_tool_calls=max_tool_calls,
+                parallel_tool_calls=parallel_tool_calls,
+                truncation=truncation,
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
                 service_tier=service_tier,
                 validation_mode=validation_mode,
             )
@@ -558,6 +639,12 @@ class OAuthCodexClient:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
             service_tier=service_tier,
             validation_mode=validation_mode,
         )
@@ -835,10 +922,18 @@ class OAuthCodexClient:
         path: str,
         payload: dict[str, Any],
         method: str = "POST",
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        validation_mode: ValidationMode | None = None,
     ) -> dict[str, Any]:
         tokens = self._ensure_authenticated_sync()
         url = self._resolve_request_url(path)
         attempted_refresh = False
+        mode = self._effective_validation_mode(validation_mode)
+        normalized_extra_headers = self._normalize_extra_headers(
+            extra_headers, validation_mode=mode
+        )
+        normalized_extra_query = self._validate_extra_query(extra_query, validation_mode=mode)
 
         for attempt in range(self.max_retries + 1):
             request_id = f"req_{uuid.uuid4().hex}"
@@ -854,8 +949,16 @@ class OAuthCodexClient:
                 },
             )
             headers = self._auth_headers(tokens)
+            if normalized_extra_headers:
+                headers.update(normalized_extra_headers)
             with httpx.Client(timeout=self.timeout) as client:
-                response = client.request(method.upper(), url, headers=headers, json=payload)
+                response = client.request(
+                    method.upper(),
+                    url,
+                    headers=headers,
+                    json=payload,
+                    params=normalized_extra_query,
+                )
             if response.status_code == 401 and not attempted_refresh:
                 tokens = self._refresh_and_persist_sync(tokens)
                 attempted_refresh = True
@@ -910,10 +1013,18 @@ class OAuthCodexClient:
         path: str,
         payload: dict[str, Any],
         method: str = "POST",
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        validation_mode: ValidationMode | None = None,
     ) -> dict[str, Any]:
         tokens = await self._ensure_authenticated_async()
         url = self._resolve_request_url(path)
         attempted_refresh = False
+        mode = self._effective_validation_mode(validation_mode)
+        normalized_extra_headers = self._normalize_extra_headers(
+            extra_headers, validation_mode=mode
+        )
+        normalized_extra_query = self._validate_extra_query(extra_query, validation_mode=mode)
 
         for attempt in range(self.max_retries + 1):
             request_id = f"req_{uuid.uuid4().hex}"
@@ -929,8 +1040,16 @@ class OAuthCodexClient:
                 },
             )
             headers = self._auth_headers(tokens)
+            if normalized_extra_headers:
+                headers.update(normalized_extra_headers)
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.request(method.upper(), url, headers=headers, json=payload)
+                response = await client.request(
+                    method.upper(),
+                    url,
+                    headers=headers,
+                    json=payload,
+                    params=normalized_extra_query,
+                )
             if response.status_code == 401 and not attempted_refresh:
                 tokens = await self._refresh_and_persist_async(tokens)
                 attempted_refresh = True
@@ -1471,6 +1590,139 @@ class OAuthCodexClient:
             return None
         return list(value)
 
+    def _validate_max_tool_calls(
+        self,
+        value: int | None,
+        *,
+        validation_mode: ValidationMode,
+    ) -> int | None:
+        if value is None:
+            return None
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            self._warn_or_error(
+                "max_tool_calls must be a positive integer",
+                code="invalid_max_tool_calls",
+                validation_mode=validation_mode,
+            )
+            return None
+        return value
+
+    def _validate_parallel_tool_calls(
+        self,
+        value: bool | None,
+        *,
+        validation_mode: ValidationMode,
+    ) -> bool | None:
+        if value is None:
+            return None
+        if not isinstance(value, bool):
+            self._warn_or_error(
+                "parallel_tool_calls must be a boolean",
+                code="invalid_parallel_tool_calls",
+                validation_mode=validation_mode,
+            )
+            return None
+        return value
+
+    def _validate_truncation(
+        self,
+        value: TruncationMode | None,
+        *,
+        validation_mode: ValidationMode,
+    ) -> TruncationMode | None:
+        if value is None:
+            return None
+        if value not in {"auto", "disabled"}:
+            self._warn_or_error(
+                "truncation must be one of: auto, disabled",
+                code="invalid_truncation",
+                validation_mode=validation_mode,
+            )
+            return None
+        return value
+
+    def _validate_extra_headers(
+        self,
+        value: dict[str, str] | None,
+        *,
+        validation_mode: ValidationMode,
+    ) -> dict[str, str] | None:
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            self._warn_or_error(
+                "extra_headers must be a dictionary",
+                code="invalid_extra_headers",
+                validation_mode=validation_mode,
+            )
+            return None
+        normalized: dict[str, str] = {}
+        for key, item in value.items():
+            if not isinstance(key, str) or not isinstance(item, str):
+                self._warn_or_error(
+                    "extra_headers keys and values must be strings",
+                    code="invalid_extra_headers",
+                    validation_mode=validation_mode,
+                )
+                return None
+            normalized[key] = item
+        return normalized
+
+    def _normalize_extra_headers(
+        self,
+        value: dict[str, str] | None,
+        *,
+        validation_mode: ValidationMode,
+    ) -> dict[str, str] | None:
+        normalized = self._validate_extra_headers(value, validation_mode=validation_mode)
+        if not normalized:
+            return normalized
+        filtered: dict[str, str] = {}
+        for key, item in normalized.items():
+            if key.lower() in self._PROTECTED_REQUEST_HEADERS:
+                self._warn_or_error(
+                    f"extra_headers cannot override protected header: {key}",
+                    code="protected_header_override",
+                    validation_mode=validation_mode,
+                )
+                continue
+            filtered[key] = item
+        return filtered
+
+    def _validate_extra_query(
+        self,
+        value: dict[str, Any] | None,
+        *,
+        validation_mode: ValidationMode,
+    ) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            self._warn_or_error(
+                "extra_query must be a dictionary",
+                code="invalid_extra_query",
+                validation_mode=validation_mode,
+            )
+            return None
+        return dict(value)
+
+    def _validate_extra_body(
+        self,
+        value: dict[str, Any] | None,
+        *,
+        validation_mode: ValidationMode,
+    ) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            self._warn_or_error(
+                "extra_body must be a dictionary",
+                code="invalid_extra_body",
+                validation_mode=validation_mode,
+            )
+            return None
+        return dict(value)
+
     def _build_responses_payload(
         self,
         *,
@@ -1490,6 +1742,10 @@ class OAuthCodexClient:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         validation_mode: ValidationMode | None = None,
         stream: bool,
@@ -1504,6 +1760,14 @@ class OAuthCodexClient:
         )
         normalized_metadata = self._validate_metadata(metadata, validation_mode=mode)
         normalized_include = self._validate_include(include, validation_mode=mode)
+        normalized_max_tool_calls = self._validate_max_tool_calls(
+            max_tool_calls, validation_mode=mode
+        )
+        normalized_parallel_tool_calls = self._validate_parallel_tool_calls(
+            parallel_tool_calls, validation_mode=mode
+        )
+        normalized_truncation = self._validate_truncation(truncation, validation_mode=mode)
+        normalized_extra_body = self._validate_extra_body(extra_body, validation_mode=mode)
         if service_tier is not None:
             self._warn_or_error(
                 "service_tier is currently ignored on codex backend",
@@ -1536,8 +1800,16 @@ class OAuthCodexClient:
             payload["metadata"] = normalized_metadata
         if normalized_include is not None:
             payload["include"] = normalized_include
+        if normalized_max_tool_calls is not None:
+            payload["max_tool_calls"] = normalized_max_tool_calls
+        if normalized_parallel_tool_calls is not None:
+            payload["parallel_tool_calls"] = normalized_parallel_tool_calls
+        if normalized_truncation is not None:
+            payload["truncation"] = normalized_truncation
         if previous_response_id:
             payload["previous_response_id"] = previous_response_id
+        if normalized_extra_body:
+            payload.update(normalized_extra_body)
         return payload
 
     def _generate_responses_sync(
@@ -1559,6 +1831,12 @@ class OAuthCodexClient:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         validation_mode: ValidationMode | None = None,
     ) -> GenerateResult:
@@ -1579,6 +1857,12 @@ class OAuthCodexClient:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
             service_tier=service_tier,
             validation_mode=validation_mode,
         )
@@ -1603,6 +1887,12 @@ class OAuthCodexClient:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         validation_mode: ValidationMode | None = None,
     ) -> GenerateResult:
@@ -1623,6 +1913,12 @@ class OAuthCodexClient:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
             service_tier=service_tier,
             validation_mode=validation_mode,
         )
@@ -1647,10 +1943,17 @@ class OAuthCodexClient:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         validation_mode: ValidationMode | None = None,
     ) -> Iterator[StreamEvent]:
         tokens = self._ensure_authenticated_sync()
+        mode = self._effective_validation_mode(validation_mode)
         payload = self._build_responses_payload(
             model=model,
             messages=messages,
@@ -1668,16 +1971,27 @@ class OAuthCodexClient:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_body=extra_body,
             service_tier=service_tier,
-            validation_mode=validation_mode,
+            validation_mode=mode,
             stream=True,
         )
+        normalized_extra_headers = self._normalize_extra_headers(
+            extra_headers, validation_mode=mode
+        )
+        normalized_extra_query = self._validate_extra_query(extra_query, validation_mode=mode)
 
         yield from self._stream_sse_sync(
             path="/responses",
             payload=payload,
             parser=self._map_responses_stream,
             tokens=tokens,
+            extra_headers=normalized_extra_headers,
+            extra_query=normalized_extra_query,
+            validation_mode=mode,
         )
 
     async def _stream_responses_async(
@@ -1699,10 +2013,17 @@ class OAuthCodexClient:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         validation_mode: ValidationMode | None = None,
     ) -> AsyncIterator[StreamEvent]:
         tokens = await self._ensure_authenticated_async()
+        mode = self._effective_validation_mode(validation_mode)
         payload = self._build_responses_payload(
             model=model,
             messages=messages,
@@ -1720,16 +2041,27 @@ class OAuthCodexClient:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_body=extra_body,
             service_tier=service_tier,
-            validation_mode=validation_mode,
+            validation_mode=mode,
             stream=True,
         )
+        normalized_extra_headers = self._normalize_extra_headers(
+            extra_headers, validation_mode=mode
+        )
+        normalized_extra_query = self._validate_extra_query(extra_query, validation_mode=mode)
 
         async for event in self._stream_sse_async(
             path="/responses",
             payload=payload,
             parser=self._map_responses_stream,
             tokens=tokens,
+            extra_headers=normalized_extra_headers,
+            extra_query=normalized_extra_query,
+            validation_mode=mode,
         ):
             yield event
 
@@ -1740,12 +2072,20 @@ class OAuthCodexClient:
         payload: dict[str, Any],
         parser,
         tokens: OAuthTokens | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        validation_mode: ValidationMode | None = None,
     ) -> Iterator[StreamEvent]:
         if tokens is None:
             tokens = self._ensure_authenticated_sync()
         url = self._resolve_request_url(path)
         attempted_refresh = False
         last_error: SDKRequestError | None = None
+        mode = self._effective_validation_mode(validation_mode)
+        normalized_extra_headers = self._normalize_extra_headers(
+            extra_headers, validation_mode=mode
+        )
+        normalized_extra_query = self._validate_extra_query(extra_query, validation_mode=mode)
 
         for attempt in range(self.max_retries + 1):
             request_id = f"req_{uuid.uuid4().hex}"
@@ -1761,8 +2101,16 @@ class OAuthCodexClient:
                 },
             )
             headers = self._auth_headers(tokens)
+            if normalized_extra_headers:
+                headers.update(normalized_extra_headers)
             with httpx.Client(timeout=self.timeout) as client:
-                with client.stream("POST", url, headers=headers, json=payload) as response:
+                with client.stream(
+                    "POST",
+                    url,
+                    headers=headers,
+                    json=payload,
+                    params=normalized_extra_query,
+                ) as response:
                     if response.status_code == 401 and not attempted_refresh:
                         tokens = self._refresh_and_persist_sync(tokens)
                         attempted_refresh = True
@@ -1833,12 +2181,20 @@ class OAuthCodexClient:
         payload: dict[str, Any],
         parser,
         tokens: OAuthTokens | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        validation_mode: ValidationMode | None = None,
     ) -> AsyncIterator[StreamEvent]:
         if tokens is None:
             tokens = await self._ensure_authenticated_async()
         url = self._resolve_request_url(path)
         attempted_refresh = False
         last_error: SDKRequestError | None = None
+        mode = self._effective_validation_mode(validation_mode)
+        normalized_extra_headers = self._normalize_extra_headers(
+            extra_headers, validation_mode=mode
+        )
+        normalized_extra_query = self._validate_extra_query(extra_query, validation_mode=mode)
 
         for attempt in range(self.max_retries + 1):
             request_id = f"req_{uuid.uuid4().hex}"
@@ -1854,8 +2210,16 @@ class OAuthCodexClient:
                 },
             )
             headers = self._auth_headers(tokens)
+            if normalized_extra_headers:
+                headers.update(normalized_extra_headers)
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                async with client.stream("POST", url, headers=headers, json=payload) as response:
+                async with client.stream(
+                    "POST",
+                    url,
+                    headers=headers,
+                    json=payload,
+                    params=normalized_extra_query,
+                ) as response:
                     if response.status_code == 401 and not attempted_refresh:
                         tokens = await self._refresh_and_persist_async(tokens)
                         attempted_refresh = True
@@ -2463,6 +2827,12 @@ class _ResponsesResource:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         stream: bool = False,
         validation_mode: ValidationMode | None = None,
@@ -2486,6 +2856,12 @@ class _ResponsesResource:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
             service_tier=service_tier,
             stream=stream,
             validation_mode=validation_mode,
@@ -2518,6 +2894,12 @@ class _AsyncResponsesResource:
         max_output_tokens: int | None = None,
         metadata: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        max_tool_calls: int | None = None,
+        parallel_tool_calls: bool | None = None,
+        truncation: TruncationMode | None = None,
+        extra_headers: dict[str, str] | None = None,
+        extra_query: dict[str, Any] | None = None,
+        extra_body: dict[str, Any] | None = None,
         service_tier: str | None = None,
         stream: bool = False,
         validation_mode: ValidationMode | None = None,
@@ -2541,6 +2923,12 @@ class _AsyncResponsesResource:
             max_output_tokens=max_output_tokens,
             metadata=metadata,
             include=include,
+            max_tool_calls=max_tool_calls,
+            parallel_tool_calls=parallel_tool_calls,
+            truncation=truncation,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
             service_tier=service_tier,
             stream=stream,
             validation_mode=validation_mode,

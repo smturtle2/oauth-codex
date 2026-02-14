@@ -25,8 +25,8 @@ class _FakeClient:
     def __exit__(self, exc_type, exc, tb):
         return False
 
-    def request(self, method, url, headers=None, json=None):
-        _ = method, url, headers, json
+    def request(self, method, url, headers=None, json=None, params=None):
+        _ = method, url, headers, json, params
         return self._responses.pop(0)
 
 

@@ -60,6 +60,12 @@ client = AsyncOAuthCodexClient()
 - `store=True` + Codex OAuth profile: 기본 `auto_disable` 정책으로 `store=False` 전환
 - `service_tier`: 기본 ignore+warn
 - `validation_mode`: `warn`(기본), `error`, `ignore`
+- `max_tool_calls`: support (양수 정수 검증)
+- `parallel_tool_calls`: support (bool 검증)
+- `truncation`: support (`auto`/`disabled` 검증)
+- `extra_headers`: support (헤더 병합, 보호 헤더 override 차단)
+- `extra_query`: support (querystring 병합)
+- `extra_body`: support (payload 마지막 merge로 override 허용)
 
 Codex profile에서 backend 미지원 기능은 SDK 내부에서 자동 보완됩니다.
 

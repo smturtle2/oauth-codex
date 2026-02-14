@@ -69,3 +69,70 @@ def test_validation_mode_ignore_suppresses_warning(monkeypatch: pytest.MonkeyPat
         )
 
     assert not captured
+
+
+def test_validation_mode_warn_emits_warning_for_new_request_options(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client("warn")
+
+    def fake_sse(**kwargs):
+        _ = kwargs
+        yield StreamEvent(type="text_delta", delta="ok")
+        yield StreamEvent(type="done")
+
+    monkeypatch.setattr(client._engine, "_stream_sse_sync", fake_sse)
+
+    with pytest.warns(RuntimeWarning):
+        client.responses.create(
+            model="gpt-5.3-codex",
+            input="hi",
+            max_tool_calls=0,
+            truncation="invalid",  # type: ignore[arg-type]
+            extra_headers={"Authorization": "override"},
+        )
+
+
+def test_validation_mode_error_raises_for_protected_header_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client("error")
+
+    def fake_sse(**kwargs):
+        _ = kwargs
+        yield StreamEvent(type="text_delta", delta="ok")
+        yield StreamEvent(type="done")
+
+    monkeypatch.setattr(client._engine, "_stream_sse_sync", fake_sse)
+
+    with pytest.raises(ParameterValidationError):
+        client.responses.create(
+            model="gpt-5.3-codex",
+            input="hi",
+            extra_headers={"Content-Type": "application/x-custom"},
+        )
+
+
+def test_validation_mode_ignore_suppresses_new_request_option_warnings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client("ignore")
+
+    def fake_sse(**kwargs):
+        _ = kwargs
+        yield StreamEvent(type="text_delta", delta="ok")
+        yield StreamEvent(type="done")
+
+    monkeypatch.setattr(client._engine, "_stream_sse_sync", fake_sse)
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        client.responses.create(
+            model="gpt-5.3-codex",
+            input="hi",
+            max_tool_calls=0,
+            truncation="invalid",  # type: ignore[arg-type]
+            extra_headers={"Authorization": "override"},
+        )
+
+    assert not captured
