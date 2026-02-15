@@ -6,6 +6,7 @@ from types import UnionType
 from typing import Any, get_args, get_origin
 
 from .core_types import ToolInput, ToolResult, ToolSchema
+from .errors import SDKRequestError
 
 
 def _python_type_to_schema(annotation: Any) -> dict[str, Any]:
@@ -165,11 +166,25 @@ def serialize_tool_output(output: str | dict[str, Any]) -> str:
 def tool_results_to_response_items(tool_results: list[ToolResult] | None) -> list[dict[str, Any]]:
     if not tool_results:
         return []
-    return [
-        {
-            "type": "function_call_output",
-            "call_id": result.tool_call_id,
-            "output": serialize_tool_output(result.output),
-        }
-        for result in tool_results
-    ]
+    items: list[dict[str, Any]] = []
+    for result in tool_results:
+        call_id = result.tool_call_id.strip()
+        if not call_id:
+            raise SDKRequestError(
+                status_code=None,
+                provider_code="invalid_tool_call_id",
+                user_message=(
+                    "tool_results contains an empty tool_call_id; "
+                    "call_id restoration may have failed for a streamed function_call_arguments event"
+                ),
+                retryable=False,
+                raw_error={"tool_name": result.name},
+            )
+        items.append(
+            {
+                "type": "function_call_output",
+                "call_id": call_id,
+                "output": serialize_tool_output(result.output),
+            }
+        )
+    return items

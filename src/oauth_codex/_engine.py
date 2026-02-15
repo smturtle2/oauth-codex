@@ -96,7 +96,10 @@ class OAuthCodexClient:
         self._refresh_leeway_seconds = 60
         self._tool_call_name_by_id: dict[str, str] = {}
         self._tool_call_args_buffer: dict[str, str] = {}
+        self._tool_call_args_buffer_by_item_id: dict[str, str] = {}
         self._tool_call_started: set[str] = set()
+        self._tool_call_id_by_item_id: dict[str, str] = {}
+        self._pending_tool_calls_by_item_id: dict[str, dict[str, Any]] = {}
         self.responses = _ResponsesResource(self)
         self.files = _FilesResource(self)
         self.vector_stores = _VectorStoresResource(self)
@@ -805,6 +808,108 @@ class OAuthCodexClient:
             normalized.append(dict(item))
         return normalized
 
+    def _non_empty_string(self, value: Any) -> str | None:
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    def _serialize_continuation_output(self, value: Any) -> str:
+        if isinstance(value, str):
+            return value
+        try:
+            return json.dumps(value, ensure_ascii=True)
+        except TypeError:
+            return str(value)
+
+    def _sanitize_message_content_part(self, part: Any) -> dict[str, Any] | None:
+        if not isinstance(part, dict):
+            return None
+        part_type = self._non_empty_string(part.get("type"))
+        if not part_type:
+            return None
+        if part_type in {"input_text", "output_text", "text"}:
+            text = part.get("text")
+            if isinstance(text, str):
+                return {"type": part_type, "text": text}
+            return None
+        if part_type == "input_image":
+            image_url = part.get("image_url")
+            if isinstance(image_url, str) and image_url:
+                return {"type": "input_image", "image_url": image_url}
+            return None
+        return None
+
+    def _sanitize_message_content(self, content: Any) -> str | list[dict[str, Any]] | None:
+        if isinstance(content, str):
+            return content
+        if not isinstance(content, list):
+            return None
+        sanitized: list[dict[str, Any]] = []
+        for part in content:
+            normalized = self._sanitize_message_content_part(part)
+            if normalized is not None:
+                sanitized.append(normalized)
+        if not sanitized:
+            return None
+        return sanitized
+
+    def _sanitize_continuation_item(self, item: Message) -> Message | None:
+        item_type = self._non_empty_string(item.get("type"))
+
+        if item_type in {"message", None}:
+            role = self._non_empty_string(item.get("role"))
+            if not role:
+                return None
+            content = self._sanitize_message_content(item.get("content"))
+            if content is None:
+                return None
+            out: Message = {"role": role, "content": content}
+            if item_type == "message":
+                out["type"] = "message"
+            return out
+
+        if item_type == "function_call":
+            call_id = self._non_empty_string(item.get("call_id"))
+            name = self._non_empty_string(item.get("name"))
+            if not call_id or not name:
+                return None
+            arguments_raw = item.get("arguments")
+            if isinstance(arguments_raw, str):
+                arguments = arguments_raw
+            elif isinstance(item.get("arguments_json"), str):
+                arguments = str(item["arguments_json"])
+            elif arguments_raw is None:
+                arguments = "{}"
+            else:
+                arguments = self._serialize_continuation_output(arguments_raw)
+            return {
+                "type": "function_call",
+                "call_id": call_id,
+                "name": name,
+                "arguments": arguments,
+            }
+
+        if item_type == "function_call_output":
+            call_id = self._non_empty_string(item.get("call_id"))
+            if not call_id:
+                return None
+            return {
+                "type": "function_call_output",
+                "call_id": call_id,
+                "output": self._serialize_continuation_output(item.get("output")),
+            }
+
+        return None
+
+    def _sanitize_continuation_items(self, items: list[Message]) -> list[Message]:
+        sanitized: list[Message] = []
+        for item in items:
+            normalized = self._sanitize_continuation_item(item)
+            if normalized is not None:
+                sanitized.append(normalized)
+        return sanitized
+
     def _build_effective_responses_input(
         self,
         *,
@@ -823,7 +928,7 @@ class OAuthCodexClient:
             self._raise_local_compat_error(exc)
             return [], None
 
-        return [*prior_items, *current_turn], None
+        return [*self._sanitize_continuation_items(prior_items), *current_turn], None
 
     def _extract_output_items_for_continuation(
         self,
@@ -841,8 +946,9 @@ class OAuthCodexClient:
                 if not isinstance(candidate, list):
                     continue
                 normalized = [dict(item) for item in candidate if isinstance(item, dict)]
-                if normalized:
-                    return normalized
+                sanitized = self._sanitize_continuation_items(normalized)
+                if sanitized:
+                    return sanitized
 
         output_items: list[Message] = []
         text = "".join(text_parts)
@@ -863,7 +969,7 @@ class OAuthCodexClient:
                     "arguments": call.arguments_json,
                 }
             )
-        return output_items
+        return self._sanitize_continuation_items(output_items)
 
     def _persist_response_continuity_sync(
         self,
@@ -882,7 +988,9 @@ class OAuthCodexClient:
             return
 
         try:
-            normalized_request_input = self._normalize_continuation_items(request_input)
+            normalized_request_input = self._sanitize_continuation_items(
+                self._normalize_continuation_items(request_input)
+            )
             output_items = self._extract_output_items_for_continuation(
                 raw_response=raw_response,
                 text_parts=text_parts,
@@ -2113,6 +2221,7 @@ class OAuthCodexClient:
             extra_headers, validation_mode=mode
         )
         normalized_extra_query = self._validate_extra_query(extra_query, validation_mode=mode)
+        self._reset_tool_call_stream_state()
         request_input: list[Message] = []
         if self._is_codex_profile():
             raw_request_input = payload.get("input")
@@ -2239,6 +2348,7 @@ class OAuthCodexClient:
             extra_headers, validation_mode=mode
         )
         normalized_extra_query = self._validate_extra_query(extra_query, validation_mode=mode)
+        self._reset_tool_call_stream_state()
         request_input: list[Message] = []
         if self._is_codex_profile():
             raw_request_input = payload.get("input")
@@ -2704,6 +2814,187 @@ class OAuthCodexClient:
             response_id=response_id,
         )
 
+    def _reset_tool_call_stream_state(self) -> None:
+        self._tool_call_name_by_id.clear()
+        self._tool_call_args_buffer.clear()
+        self._tool_call_args_buffer_by_item_id.clear()
+        self._tool_call_started.clear()
+        self._tool_call_id_by_item_id.clear()
+        self._pending_tool_calls_by_item_id.clear()
+
+    def _iter_function_call_items_from_stream_payload(
+        self,
+        payload: dict[str, Any],
+    ) -> Iterator[dict[str, Any]]:
+        def maybe_yield(item: Any) -> Iterator[dict[str, Any]]:
+            if isinstance(item, dict) and item.get("type") == "function_call":
+                yield item
+
+        for key in ("item", "output_item"):
+            candidate = payload.get(key)
+            yield from maybe_yield(candidate)
+
+        for key in ("response",):
+            candidate = payload.get(key)
+            if not isinstance(candidate, dict):
+                continue
+            output = candidate.get("output")
+            if not isinstance(output, list):
+                continue
+            for item in output:
+                yield from maybe_yield(item)
+
+        output = payload.get("output")
+        if isinstance(output, list):
+            for item in output:
+                yield from maybe_yield(item)
+
+    def _remember_tool_call_items_from_stream_payload(self, payload: dict[str, Any]) -> None:
+        for item in self._iter_function_call_items_from_stream_payload(payload):
+            item_id = self._non_empty_string(item.get("id") or item.get("item_id"))
+            call_id = self._non_empty_string(item.get("call_id"))
+            name = self._non_empty_string(item.get("name"))
+
+            if call_id and name:
+                self._tool_call_name_by_id[call_id] = name
+            if not item_id or not call_id:
+                continue
+
+            self._tool_call_id_by_item_id[item_id] = call_id
+            buffered_by_item = self._tool_call_args_buffer_by_item_id.pop(item_id, "")
+            if buffered_by_item and not self._tool_call_args_buffer.get(call_id):
+                self._tool_call_args_buffer[call_id] = buffered_by_item
+
+    def _resolve_stream_tool_call_identity(self, payload: dict[str, Any]) -> tuple[str, str | None]:
+        call_id = self._non_empty_string(payload.get("call_id") or payload.get("id")) or ""
+        item_id = self._non_empty_string(payload.get("item_id"))
+
+        if call_id and item_id:
+            self._tool_call_id_by_item_id[item_id] = call_id
+            buffered_by_item = self._tool_call_args_buffer_by_item_id.pop(item_id, "")
+            if buffered_by_item and not self._tool_call_args_buffer.get(call_id):
+                self._tool_call_args_buffer[call_id] = buffered_by_item
+        elif not call_id and item_id:
+            call_id = self._tool_call_id_by_item_id.get(item_id, "")
+
+        return call_id, item_id
+
+    def _emit_tool_call_started(
+        self,
+        out: list[StreamEvent],
+        *,
+        call_id: str,
+        response_id: str | None,
+        raw: dict[str, Any],
+    ) -> None:
+        if call_id in self._tool_call_started:
+            return
+        self._tool_call_started.add(call_id)
+        out.append(
+            StreamEvent(
+                type="tool_call_started",
+                call_id=call_id,
+                response_id=response_id,
+                raw=raw,
+            )
+        )
+
+    def _emit_tool_call_done(
+        self,
+        out: list[StreamEvent],
+        *,
+        call_id: str,
+        name: str,
+        arguments_json: str,
+        response_id: str | None,
+        raw: dict[str, Any],
+    ) -> None:
+        out.append(
+            StreamEvent(
+                type="tool_call_done",
+                tool_call=self._build_tool_call(call_id, name, arguments_json),
+                call_id=call_id,
+                response_id=response_id,
+                raw=raw,
+            )
+        )
+
+    def _clear_tool_call_tracking(self, *, call_id: str, item_id: str | None = None) -> None:
+        self._tool_call_started.discard(call_id)
+        self._tool_call_args_buffer.pop(call_id, None)
+        self._tool_call_name_by_id.pop(call_id, None)
+        if item_id:
+            self._tool_call_id_by_item_id.pop(item_id, None)
+            self._tool_call_args_buffer_by_item_id.pop(item_id, None)
+            self._pending_tool_calls_by_item_id.pop(item_id, None)
+
+    def _flush_pending_tool_calls(
+        self,
+        out: list[StreamEvent],
+        *,
+        response_id: str | None,
+        strict: bool,
+    ) -> None:
+        unresolved: list[dict[str, Any]] = []
+        for item_id, pending in list(self._pending_tool_calls_by_item_id.items()):
+            call_id = self._tool_call_id_by_item_id.get(item_id)
+            if not call_id:
+                if strict:
+                    unresolved.append(
+                        {
+                            "item_id": item_id,
+                            "source_event_type": pending.get("event_type"),
+                        }
+                    )
+                continue
+
+            name = str(
+                pending.get("name")
+                or self._tool_call_name_by_id.get(call_id)
+                or "tool"
+            )
+            arguments_json = str(
+                pending.get("arguments_json")
+                or self._tool_call_args_buffer.get(call_id)
+                or "{}"
+            )
+            raw_payload = pending.get("raw")
+            raw = raw_payload if isinstance(raw_payload, dict) else {}
+            pending_response_id = pending.get("response_id")
+            resolved_response_id = (
+                pending_response_id if isinstance(pending_response_id, str) else response_id
+            )
+
+            self._tool_call_name_by_id[call_id] = name
+            self._emit_tool_call_started(
+                out,
+                call_id=call_id,
+                response_id=resolved_response_id,
+                raw=raw,
+            )
+            self._emit_tool_call_done(
+                out,
+                call_id=call_id,
+                name=name,
+                arguments_json=arguments_json,
+                response_id=resolved_response_id,
+                raw=raw,
+            )
+            self._clear_tool_call_tracking(call_id=call_id, item_id=item_id)
+
+        if unresolved:
+            self._reset_tool_call_stream_state()
+            raise SDKRequestError(
+                status_code=None,
+                provider_code="tool_call_id_unresolved",
+                user_message=(
+                    "Unable to restore function call_id from function_call_arguments events "
+                    "before response.completed"
+                ),
+                retryable=False,
+                raw_error={"unresolved_tool_calls": unresolved},
+            )
+
     def _map_responses_stream(
         self,
         event_name: str,
@@ -2712,6 +3003,9 @@ class OAuthCodexClient:
         out: list[StreamEvent] = []
         event_type = str(payload.get("type") or event_name)
         response_id = self._extract_response_id(payload)
+
+        self._remember_tool_call_items_from_stream_payload(payload)
+        self._flush_pending_tool_calls(out, response_id=response_id, strict=False)
 
         if event_type.endswith("created"):
             out.append(
@@ -2747,29 +3041,29 @@ class OAuthCodexClient:
                 )
 
         if "function_call_arguments.delta" in event_type:
-            call_id = str(payload.get("call_id") or payload.get("id") or "")
+            call_id, item_id = self._resolve_stream_tool_call_identity(payload)
             name = str(payload.get("name") or self._tool_call_name_by_id.get(call_id) or "tool")
+            delta_val = payload.get("delta")
+            delta_text = delta_val if isinstance(delta_val, str) else ""
+
             if call_id:
                 self._tool_call_name_by_id[call_id] = name
                 prev = self._tool_call_args_buffer.get(call_id, "")
-                delta_val = payload.get("delta")
-                delta_text = delta_val if isinstance(delta_val, str) else ""
                 self._tool_call_args_buffer[call_id] = prev + delta_text
-                if call_id not in self._tool_call_started:
-                    self._tool_call_started.add(call_id)
-                    out.append(
-                        StreamEvent(
-                            type="tool_call_started",
-                            call_id=call_id,
-                            response_id=response_id,
-                            raw=payload,
-                        )
-                    )
-            delta = payload.get("delta")
+                self._emit_tool_call_started(
+                    out,
+                    call_id=call_id,
+                    response_id=response_id,
+                    raw=payload,
+                )
+            elif item_id:
+                prev = self._tool_call_args_buffer_by_item_id.get(item_id, "")
+                self._tool_call_args_buffer_by_item_id[item_id] = prev + delta_text
+
             out.append(
                 StreamEvent(
                     type="tool_call_arguments_delta",
-                    delta=delta if isinstance(delta, str) else None,
+                    delta=delta_val if isinstance(delta_val, str) else None,
                     call_id=call_id or None,
                     response_id=response_id,
                     raw=payload,
@@ -2777,36 +3071,51 @@ class OAuthCodexClient:
             )
 
         if "function_call_arguments.done" in event_type:
-            call_id = str(payload.get("call_id") or payload.get("id") or "")
+            call_id, item_id = self._resolve_stream_tool_call_identity(payload)
             name = str(payload.get("name") or self._tool_call_name_by_id.get(call_id) or "tool")
-            arguments_json = str(
-                payload.get("arguments")
-                or self._tool_call_args_buffer.get(call_id)
-                or "{}"
-            )
-            if call_id and call_id not in self._tool_call_started:
-                self._tool_call_started.add(call_id)
-                out.append(
-                    StreamEvent(
-                        type="tool_call_started",
-                        call_id=call_id,
-                        response_id=response_id,
-                        raw=payload,
-                    )
-                )
-            out.append(
-                StreamEvent(
-                    type="tool_call_done",
-                    tool_call=self._build_tool_call(call_id, name, arguments_json),
-                    call_id=call_id or None,
+            payload_arguments = payload.get("arguments")
+            buffered_arguments = self._tool_call_args_buffer.get(call_id) if call_id else None
+            if not buffered_arguments and item_id:
+                buffered_arguments = self._tool_call_args_buffer_by_item_id.get(item_id)
+            arguments_json = str(payload_arguments or buffered_arguments or "{}")
+
+            if call_id:
+                self._tool_call_name_by_id[call_id] = name
+                self._emit_tool_call_started(
+                    out,
+                    call_id=call_id,
                     response_id=response_id,
                     raw=payload,
                 )
-            )
-            if call_id:
-                self._tool_call_started.discard(call_id)
-                self._tool_call_args_buffer.pop(call_id, None)
-                self._tool_call_name_by_id.pop(call_id, None)
+                self._emit_tool_call_done(
+                    out,
+                    call_id=call_id,
+                    name=name,
+                    arguments_json=arguments_json,
+                    response_id=response_id,
+                    raw=payload,
+                )
+                self._clear_tool_call_tracking(call_id=call_id, item_id=item_id)
+            elif item_id:
+                self._pending_tool_calls_by_item_id[item_id] = {
+                    "name": name,
+                    "arguments_json": arguments_json,
+                    "event_type": event_type,
+                    "response_id": response_id,
+                    "raw": payload,
+                }
+            else:
+                self._reset_tool_call_stream_state()
+                raise SDKRequestError(
+                    status_code=None,
+                    provider_code="tool_call_id_unresolved",
+                    user_message=(
+                        "Unable to restore function call_id from function_call_arguments event "
+                        "(missing both call_id and item_id)"
+                    ),
+                    retryable=False,
+                    raw_error={"event_type": event_type, "payload": payload},
+                )
 
         if "usage" in payload:
             out.append(
@@ -2827,7 +3136,8 @@ class OAuthCodexClient:
                 )
             )
 
-        if event_type.endswith("completed"):
+        if event_type == "response.completed":
+            self._flush_pending_tool_calls(out, response_id=response_id, strict=True)
             out.append(
                 StreamEvent(
                     type="response_completed",
@@ -2837,6 +3147,7 @@ class OAuthCodexClient:
                 )
             )
             out.append(StreamEvent(type="done", response_id=response_id, raw=payload))
+            self._reset_tool_call_stream_state()
 
         if event_type.endswith("error") or payload.get("error"):
             out.append(
@@ -2847,6 +3158,7 @@ class OAuthCodexClient:
                     error=self._extract_error_text(payload),
                 )
             )
+            self._reset_tool_call_stream_state()
 
         return out
 
