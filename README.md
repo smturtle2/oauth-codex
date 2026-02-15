@@ -50,6 +50,24 @@ text = client.generate(
 print(text)
 ```
 
+Single-parameter Pydantic tool inputs are also supported.
+
+```python
+from pydantic import BaseModel
+
+
+class ToolInput(BaseModel):
+    query: str
+
+
+def tool(input: ToolInput) -> str:
+    return f"Tool received query: {input.query}"
+
+
+text = client.generate("Use the tool", tools=[tool])
+print(text)
+```
+
 If a tool raises an exception, the SDK forwards it to the model as `{\"error\": ...}` and continues the loop.
 
 ## Async

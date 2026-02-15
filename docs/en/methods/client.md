@@ -56,6 +56,23 @@ def get_weather(city: str) -> dict:
 text = client.generate("What's weather in Seoul?", tools=[get_weather])
 ```
 
+Single-parameter Pydantic tool inputs are also supported.
+
+```python
+from pydantic import BaseModel
+
+
+class ToolInput(BaseModel):
+    query: str
+
+
+def tool(input: ToolInput) -> str:
+    return f"Tool received query: {input.query}"
+
+
+text = client.generate("Use the tool", tools=[tool])
+```
+
 Tool exceptions are forwarded to the model as `{ "error": "..." }` and the loop continues.
 
 ## Streaming

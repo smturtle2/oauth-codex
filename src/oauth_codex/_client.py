@@ -6,7 +6,9 @@ import inspect
 import json
 import mimetypes
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Iterator
+from typing import Any, AsyncIterator, Callable, Iterator, get_type_hints
+
+from pydantic import BaseModel
 
 from ._base_client import SyncAPIClient
 from ._engine import OAuthCodexClient as _EngineClient
@@ -371,7 +373,8 @@ class OAuthCodexClient(SyncAPIClient):
             else:
                 try:
                     kwargs = self._parse_tool_kwargs(call.arguments_json)
-                    value = tool(**kwargs)
+                    normalized_kwargs = self._normalize_tool_kwargs(tool, kwargs)
+                    value = tool(**normalized_kwargs)
                     if inspect.isawaitable(value):
                         raise TypeError("async tool is not supported in generate(); use agenerate()")
                     output = self._normalize_tool_output(value)
@@ -394,7 +397,8 @@ class OAuthCodexClient(SyncAPIClient):
             else:
                 try:
                     kwargs = self._parse_tool_kwargs(call.arguments_json)
-                    value = tool(**kwargs)
+                    normalized_kwargs = self._normalize_tool_kwargs(tool, kwargs)
+                    value = tool(**normalized_kwargs)
                     if inspect.isawaitable(value):
                         value = await value
                     output = self._normalize_tool_output(value)
@@ -410,6 +414,74 @@ class OAuthCodexClient(SyncAPIClient):
         if not isinstance(parsed, dict):
             raise TypeError("tool arguments must be a JSON object")
         return parsed
+
+    def _normalize_tool_kwargs(
+        self,
+        tool: Callable[..., Any],
+        kwargs: dict[str, Any],
+    ) -> dict[str, Any]:
+        signature = inspect.signature(tool)
+        resolved_hints = self._resolve_tool_type_hints(tool)
+        params = [
+            param
+            for param in signature.parameters.values()
+            if param.kind not in (param.VAR_POSITIONAL, param.VAR_KEYWORD)
+        ]
+        if not params:
+            return kwargs
+
+        if len(params) == 1:
+            param = params[0]
+            model_type = self._resolve_pydantic_model_type(
+                resolved_hints.get(param.name, param.annotation)
+            )
+            if model_type is not None:
+                if param.name in kwargs:
+                    payload = kwargs[param.name]
+                    if isinstance(payload, model_type):
+                        return kwargs
+                    if not isinstance(payload, dict):
+                        raise TypeError(f"tool argument `{param.name}` must be a JSON object")
+                    normalized = dict(kwargs)
+                    normalized[param.name] = model_type.model_validate(payload)
+                    return normalized
+
+                if not kwargs and param.default is not inspect._empty:
+                    return kwargs
+
+                payload = kwargs
+                normalized_payload = (
+                    payload
+                    if isinstance(payload, model_type)
+                    else model_type.model_validate(payload)
+                )
+                return {param.name: normalized_payload}
+
+        normalized = dict(kwargs)
+        for param in params:
+            model_type = self._resolve_pydantic_model_type(
+                resolved_hints.get(param.name, param.annotation)
+            )
+            if model_type is None or param.name not in normalized:
+                continue
+            payload = normalized[param.name]
+            if isinstance(payload, model_type):
+                continue
+            if not isinstance(payload, dict):
+                raise TypeError(f"tool argument `{param.name}` must be a JSON object")
+            normalized[param.name] = model_type.model_validate(payload)
+        return normalized
+
+    def _resolve_pydantic_model_type(self, annotation: Any) -> type[BaseModel] | None:
+        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+            return annotation
+        return None
+
+    def _resolve_tool_type_hints(self, tool: Callable[..., Any]) -> dict[str, Any]:
+        try:
+            return get_type_hints(tool)
+        except Exception:
+            return {}
 
     def _normalize_tool_output(self, output: Any) -> dict[str, Any]:
         return normalize_tool_output(output)

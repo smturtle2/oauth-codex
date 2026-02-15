@@ -56,6 +56,23 @@ def get_weather(city: str) -> dict:
 text = client.generate("서울 날씨 알려줘", tools=[get_weather])
 ```
 
+단일 파라미터 Pydantic 입력 툴도 지원합니다.
+
+```python
+from pydantic import BaseModel
+
+
+class ToolInput(BaseModel):
+    query: str
+
+
+def tool(input: ToolInput) -> str:
+    return f"Tool received query: {input.query}"
+
+
+text = client.generate("툴을 사용해줘", tools=[tool])
+```
+
 툴 실행 예외는 `{ "error": "..." }` 형태로 모델에 전달되어 루프가 이어집니다.
 
 ## 스트리밍

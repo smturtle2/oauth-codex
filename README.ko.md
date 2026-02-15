@@ -50,6 +50,24 @@ text = client.generate(
 print(text)
 ```
 
+단일 파라미터 Pydantic 입력 툴도 지원합니다.
+
+```python
+from pydantic import BaseModel
+
+
+class ToolInput(BaseModel):
+    query: str
+
+
+def tool(input: ToolInput) -> str:
+    return f"Tool received query: {input.query}"
+
+
+text = client.generate("툴을 사용해줘", tools=[tool])
+print(text)
+```
+
 툴 실행 중 예외가 발생하면 SDK는 `{\"error\": ...}` 형태로 모델에 전달하고 루프를 계속 진행합니다.
 
 ## Async

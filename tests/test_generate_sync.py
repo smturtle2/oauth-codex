@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import BaseModel, Field
 
 from conftest import InMemoryTokenStore
 from oauth_codex import Client
 from oauth_codex.core_types import GenerateResult, OAuthTokens, StreamEvent, ToolCall
+
+
+class ToolInputWithDescription(BaseModel):
+    query: str = Field(..., description="The query to be processed by the tool.")
+
+
+class ToolInput(BaseModel):
+    query: str
 
 
 def _client() -> Client:
@@ -145,6 +154,75 @@ def test_generate_wraps_string_tool_output_as_dict(monkeypatch: pytest.MonkeyPat
     assert out == "done"
     tool_results = calls[1]["tool_results"]
     assert tool_results[0].output == {"output": "hello"}
+
+
+def test_generate_supports_single_pydantic_tool_input_with_flat_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+    calls: list[dict[str, object]] = []
+
+    def fake_generate(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return GenerateResult(
+                text="",
+                tool_calls=[ToolCall(id="call_1", name="tool", arguments_json='{"query":"hello"}')],
+                finish_reason="tool_calls",
+                response_id="resp_1",
+            )
+        return GenerateResult(text="done", tool_calls=[], finish_reason="stop", response_id="resp_2")
+
+    monkeypatch.setattr(client._engine, "generate", fake_generate)
+
+    def tool(input: ToolInputWithDescription) -> str:
+        return f"Tool received query: {input.query}"
+
+    out = client.generate("run", tools=[tool])
+
+    assert out == "done"
+    first_round_tools = calls[0]["tools"]
+    assert isinstance(first_round_tools, list)
+    assert first_round_tools[0]["parameters"]["type"] == "object"
+    assert "query" in first_round_tools[0]["parameters"]["properties"]
+    assert "input" not in first_round_tools[0]["parameters"]["properties"]
+    tool_results = calls[1]["tool_results"]
+    assert tool_results[0].output == {"output": "Tool received query: hello"}
+
+
+def test_generate_supports_single_pydantic_tool_input_with_nested_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+    calls: list[dict[str, object]] = []
+
+    def fake_generate(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return GenerateResult(
+                text="",
+                tool_calls=[
+                    ToolCall(
+                        id="call_1",
+                        name="tool",
+                        arguments_json='{"input":{"query":"hello"}}',
+                    )
+                ],
+                finish_reason="tool_calls",
+                response_id="resp_1",
+            )
+        return GenerateResult(text="done", tool_calls=[], finish_reason="stop", response_id="resp_2")
+
+    monkeypatch.setattr(client._engine, "generate", fake_generate)
+
+    def tool(input: ToolInput) -> str:
+        return f"Tool received query: {input.query}"
+
+    out = client.generate("run", tools=[tool])
+
+    assert out == "done"
+    tool_results = calls[1]["tool_results"]
+    assert tool_results[0].output == {"output": "Tool received query: hello"}
 
 
 def test_generate_raises_when_tool_round_limit_exceeded(monkeypatch: pytest.MonkeyPatch) -> None:

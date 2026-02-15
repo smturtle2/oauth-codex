@@ -3,10 +3,31 @@ from __future__ import annotations
 import inspect
 import json
 from types import UnionType
-from typing import Any, get_args, get_origin
+from typing import Any, get_args, get_origin, get_type_hints
 
 from .core_types import ToolInput, ToolResult, ToolSchema
 from .errors import SDKRequestError
+
+try:
+    from pydantic import BaseModel
+except Exception:  # pragma: no cover - pydantic is a runtime dependency
+    BaseModel = None  # type: ignore[assignment]
+
+
+def _is_pydantic_model_type(annotation: Any) -> bool:
+    return bool(
+        BaseModel is not None
+        and isinstance(annotation, type)
+        and issubclass(annotation, BaseModel)
+    )
+
+
+def _pydantic_model_to_schema(model_type: type[Any]) -> dict[str, Any]:
+    if hasattr(model_type, "model_json_schema"):
+        schema = model_type.model_json_schema()
+        if isinstance(schema, dict):
+            return schema
+    return {"type": "object"}
 
 
 def _python_type_to_schema(annotation: Any) -> dict[str, Any]:
@@ -33,6 +54,8 @@ def _python_type_to_schema(annotation: Any) -> dict[str, Any]:
     args = get_args(annotation)
 
     if origin is None:
+        if _is_pydantic_model_type(annotation):
+            return _pydantic_model_to_schema(annotation)
         if annotation is str:
             return {"type": "string"}
         if annotation is int:
@@ -67,16 +90,39 @@ def _python_type_to_schema(annotation: Any) -> dict[str, Any]:
 
 def callable_to_tool_schema(func: Any) -> ToolSchema:
     signature = inspect.signature(func)
+    try:
+        resolved_hints = get_type_hints(func)
+    except Exception:
+        resolved_hints = {}
+
     doc = inspect.getdoc(func) or ""
     description = doc.splitlines()[0] if doc else f"Tool `{getattr(func, '__name__', 'tool')}`"
+
+    params = [
+        param
+        for param in signature.parameters.values()
+        if param.kind not in (param.VAR_POSITIONAL, param.VAR_KEYWORD)
+    ]
+    if len(params) == 1:
+        single = params[0]
+        single_annotation = resolved_hints.get(single.name, single.annotation)
+        if _is_pydantic_model_type(single_annotation):
+            model_schema = _python_type_to_schema(single_annotation)
+            if model_schema.get("type") == "object":
+                return {
+                    "type": "function",
+                    "name": getattr(func, "__name__", "tool"),
+                    "description": description,
+                    "parameters": model_schema,
+                }
 
     properties: dict[str, Any] = {}
     required: list[str] = []
 
-    for name, param in signature.parameters.items():
-        if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
-            continue
-        properties[name] = _python_type_to_schema(param.annotation)
+    for param in params:
+        name = param.name
+        annotation = resolved_hints.get(name, param.annotation)
+        properties[name] = _python_type_to_schema(annotation)
         if param.default is inspect._empty:
             required.append(name)
 
@@ -91,6 +137,7 @@ def callable_to_tool_schema(func: Any) -> ToolSchema:
             "additionalProperties": False,
         },
     }
+
 
 
 def _normalize_dict_tool(tool: dict[str, Any]) -> ToolSchema:

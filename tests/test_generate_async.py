@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import BaseModel
 
 from conftest import InMemoryTokenStore
 from oauth_codex import Client
 from oauth_codex.core_types import GenerateResult, OAuthTokens, StreamEvent, ToolCall
+
+
+class ToolInput(BaseModel):
+    query: str
 
 
 def _client() -> Client:
@@ -82,3 +87,31 @@ async def test_astream_supports_tool_calls(monkeypatch: pytest.MonkeyPatch) -> N
     assert calls[1]["previous_response_id"] == "resp_1"
     tool_results = calls[1]["tool_results"]
     assert tool_results[0].output == {"product": 12}
+
+
+@pytest.mark.asyncio
+async def test_agenerate_supports_single_pydantic_tool_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _client()
+    calls: list[dict[str, object]] = []
+
+    async def fake_agenerate(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return GenerateResult(
+                text="",
+                tool_calls=[ToolCall(id="call_1", name="tool", arguments_json='{"query":"hello"}')],
+                finish_reason="tool_calls",
+                response_id="resp_1",
+            )
+        return GenerateResult(text="done", tool_calls=[], finish_reason="stop", response_id="resp_2")
+
+    monkeypatch.setattr(client._engine, "agenerate", fake_agenerate)
+
+    def tool(input: ToolInput) -> str:
+        return f"Tool received query: {input.query}"
+
+    out = await client.agenerate("run", tools=[tool])
+
+    assert out == "done"
+    tool_results = calls[1]["tool_results"]
+    assert tool_results[0].output == {"output": "Tool received query: hello"}
