@@ -45,6 +45,7 @@ async def test_agenerate_auto_function_calling(monkeypatch: pytest.MonkeyPatch) 
 
     assert out == "12"
     assert calls[1]["previous_response_id"] == "resp_1"
+    assert calls[1]["messages"] == []
     tool_results = calls[1]["tool_results"]
     assert tool_results[0].output == {"sum": 12}
 
@@ -85,6 +86,7 @@ async def test_astream_supports_tool_calls(monkeypatch: pytest.MonkeyPatch) -> N
 
     assert out == ["X", "Y"]
     assert calls[1]["previous_response_id"] == "resp_1"
+    assert calls[1]["messages"] == []
     tool_results = calls[1]["tool_results"]
     assert tool_results[0].output == {"product": 12}
 

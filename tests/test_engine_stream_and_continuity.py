@@ -4,7 +4,7 @@ import pytest
 
 from conftest import InMemoryTokenStore
 from oauth_codex._engine import OAuthCodexClient as EngineClient
-from oauth_codex.core_types import OAuthTokens, ToolResult
+from oauth_codex.core_types import GenerateResult, OAuthTokens, ToolResult
 from oauth_codex.errors import SDKRequestError
 from oauth_codex.tooling import tool_results_to_response_items
 
@@ -168,3 +168,47 @@ def test_extract_output_items_for_continuation_sanitizes_response_output() -> No
     assert [item.get("type") for item in items] == ["message", "function_call"]
     assert all("id" not in item for item in items)
     assert all("status" not in item for item in items)
+
+
+def test_generate_allows_empty_messages_for_tool_continuation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = _engine()
+    captured: dict[str, object] = {}
+
+    def fake_generate_responses_sync(**kwargs):
+        captured.update(kwargs)
+        return GenerateResult(text="ok", tool_calls=[], finish_reason="stop")
+
+    monkeypatch.setattr(engine, "_generate_responses_sync", fake_generate_responses_sync)
+
+    out = engine.generate(
+        model="gpt-5.3-codex",
+        messages=[],
+        tool_results=[ToolResult(tool_call_id="call_1", name="tool", output={"ok": True})],
+        previous_response_id="resp_1",
+        return_details=True,
+    )
+
+    assert isinstance(out, GenerateResult)
+    assert captured["messages"] == []
+
+
+def test_generate_rejects_empty_messages_without_tool_continuation() -> None:
+    engine = _engine()
+
+    with pytest.raises(ValueError, match="non-empty"):
+        engine.generate(
+            model="gpt-5.3-codex",
+            messages=[],
+            tool_results=[ToolResult(tool_call_id="call_1", name="tool", output={"ok": True})],
+            previous_response_id=None,
+        )
+
+    with pytest.raises(ValueError, match="non-empty"):
+        engine.generate(
+            model="gpt-5.3-codex",
+            messages=[],
+            tool_results=[],
+            previous_response_id="resp_1",
+        )

@@ -25,7 +25,7 @@ from .store import FallbackTokenStore
 from .tooling import callable_to_tool_schema, normalize_tool_output
 
 DEFAULT_MODEL = "gpt-5.3-codex"
-DEFAULT_MAX_TOOL_ROUNDS = 8
+DEFAULT_MAX_TOOL_ROUNDS = 16
 
 
 class OAuthCodexClient(SyncAPIClient):
@@ -107,7 +107,11 @@ class OAuthCodexClient(SyncAPIClient):
         for _ in range(self.max_tool_rounds):
             result = self._engine.generate(
                 model=self._resolve_model(model),
-                messages=messages,
+                messages=self._messages_for_round(
+                    messages=messages,
+                    previous_response_id=previous_response_id,
+                    tool_results=tool_results,
+                ),
                 tools=normalized_tools,
                 tool_results=tool_results,
                 reasoning={"effort": reasoning_effort},
@@ -153,7 +157,11 @@ class OAuthCodexClient(SyncAPIClient):
         for _ in range(self.max_tool_rounds):
             result = await self._engine.agenerate(
                 model=self._resolve_model(model),
-                messages=messages,
+                messages=self._messages_for_round(
+                    messages=messages,
+                    previous_response_id=previous_response_id,
+                    tool_results=tool_results,
+                ),
                 tools=normalized_tools,
                 tool_results=tool_results,
                 reasoning={"effort": reasoning_effort},
@@ -200,7 +208,11 @@ class OAuthCodexClient(SyncAPIClient):
             round_response_id: str | None = previous_response_id
             events = self._engine.generate_stream(
                 model=self._resolve_model(model),
-                messages=messages,
+                messages=self._messages_for_round(
+                    messages=messages,
+                    previous_response_id=previous_response_id,
+                    tool_results=tool_results,
+                ),
                 tools=normalized_tools,
                 tool_results=tool_results,
                 reasoning={"effort": reasoning_effort},
@@ -249,7 +261,11 @@ class OAuthCodexClient(SyncAPIClient):
             round_response_id: str | None = previous_response_id
             events = await self._engine.agenerate_stream(
                 model=self._resolve_model(model),
-                messages=messages,
+                messages=self._messages_for_round(
+                    messages=messages,
+                    previous_response_id=previous_response_id,
+                    tool_results=tool_results,
+                ),
                 tools=normalized_tools,
                 tool_results=tool_results,
                 reasoning={"effort": reasoning_effort},
@@ -277,6 +293,28 @@ class OAuthCodexClient(SyncAPIClient):
 
     def _resolve_model(self, model: str | None) -> str:
         return model or self.default_model
+
+    def _is_tool_continuation_round(
+        self,
+        *,
+        previous_response_id: str | None,
+        tool_results: list[ToolResult] | None,
+    ) -> bool:
+        return bool(previous_response_id) and bool(tool_results)
+
+    def _messages_for_round(
+        self,
+        *,
+        messages: list[Message],
+        previous_response_id: str | None,
+        tool_results: list[ToolResult] | None,
+    ) -> list[Message]:
+        if self._is_tool_continuation_round(
+            previous_response_id=previous_response_id,
+            tool_results=tool_results,
+        ):
+            return []
+        return messages
 
     def _build_messages(
         self,

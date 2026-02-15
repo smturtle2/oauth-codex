@@ -199,7 +199,15 @@ class OAuthCodexClient:
     ) -> str | GenerateResult:
         self._require_responses_mode(api_mode)
 
-        normalized_messages = self._normalize_messages(prompt=prompt, messages=messages)
+        allows_empty_messages = self._is_tool_continuation_request(
+            previous_response_id=previous_response_id,
+            tool_results=tool_results,
+        )
+        normalized_messages = self._normalize_messages(
+            prompt=prompt,
+            messages=messages,
+            allow_empty_messages=allows_empty_messages,
+        )
         normalized_tools = normalize_tool_inputs(tools)
         normalized_tool_results = self._normalize_tool_results(tool_results)
 
@@ -276,7 +284,15 @@ class OAuthCodexClient:
     ) -> str | GenerateResult:
         self._require_responses_mode(api_mode)
 
-        normalized_messages = self._normalize_messages(prompt=prompt, messages=messages)
+        allows_empty_messages = self._is_tool_continuation_request(
+            previous_response_id=previous_response_id,
+            tool_results=tool_results,
+        )
+        normalized_messages = self._normalize_messages(
+            prompt=prompt,
+            messages=messages,
+            allow_empty_messages=allows_empty_messages,
+        )
         normalized_tools = normalize_tool_inputs(tools)
         normalized_tool_results = self._normalize_tool_results(tool_results)
 
@@ -353,7 +369,15 @@ class OAuthCodexClient:
     ) -> Iterator[str] | Iterator[StreamEvent]:
         self._require_responses_mode(api_mode)
 
-        normalized_messages = self._normalize_messages(prompt=prompt, messages=messages)
+        allows_empty_messages = self._is_tool_continuation_request(
+            previous_response_id=previous_response_id,
+            tool_results=tool_results,
+        )
+        normalized_messages = self._normalize_messages(
+            prompt=prompt,
+            messages=messages,
+            allow_empty_messages=allows_empty_messages,
+        )
         normalized_tools = normalize_tool_inputs(tools)
         normalized_tool_results = self._normalize_tool_results(tool_results)
 
@@ -426,7 +450,15 @@ class OAuthCodexClient:
     ) -> AsyncIterator[str] | AsyncIterator[StreamEvent]:
         self._require_responses_mode(api_mode)
 
-        normalized_messages = self._normalize_messages(prompt=prompt, messages=messages)
+        allows_empty_messages = self._is_tool_continuation_request(
+            previous_response_id=previous_response_id,
+            tool_results=tool_results,
+        )
+        normalized_messages = self._normalize_messages(
+            prompt=prompt,
+            messages=messages,
+            allow_empty_messages=allows_empty_messages,
+        )
         normalized_tools = normalize_tool_inputs(tools)
         normalized_tool_results = self._normalize_tool_results(tool_results)
 
@@ -1392,6 +1424,7 @@ class OAuthCodexClient:
         *,
         prompt: str | None,
         messages: list[Message] | None,
+        allow_empty_messages: bool = False,
     ) -> list[Message]:
         if (prompt is None and messages is None) or (prompt is not None and messages is not None):
             raise ValueError("Provide exactly one of `prompt` or `messages`")
@@ -1399,9 +1432,19 @@ class OAuthCodexClient:
         if prompt is not None:
             return [{"role": "user", "content": prompt}]
 
-        if not isinstance(messages, list) or not messages:
+        if not isinstance(messages, list):
+            raise ValueError("`messages` must be a non-empty list")
+        if not messages and not allow_empty_messages:
             raise ValueError("`messages` must be a non-empty list")
         return [dict(item) for item in messages]
+
+    def _is_tool_continuation_request(
+        self,
+        *,
+        previous_response_id: str | None,
+        tool_results: list[ToolResult] | None,
+    ) -> bool:
+        return bool(previous_response_id) and bool(tool_results)
 
     def _normalize_tool_results(
         self,

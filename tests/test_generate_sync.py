@@ -95,10 +95,40 @@ def test_generate_auto_function_calling(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert out == "5"
     assert calls[1]["previous_response_id"] == "resp_1"
+    assert calls[1]["messages"] == []
     tool_results = calls[1]["tool_results"]
     assert len(tool_results) == 1
     assert tool_results[0].name == "add"
     assert tool_results[0].output == {"sum": 5}
+
+
+def test_generate_replays_messages_when_tool_round_has_no_response_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+    calls: list[dict[str, object]] = []
+
+    def fake_generate(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return GenerateResult(
+                text="",
+                tool_calls=[ToolCall(id="call_1", name="add", arguments_json='{"a":1,"b":2}')],
+                finish_reason="tool_calls",
+                response_id=None,
+            )
+        return GenerateResult(text="3", tool_calls=[], finish_reason="stop", response_id="resp_2")
+
+    monkeypatch.setattr(client._engine, "generate", fake_generate)
+
+    def add(a: int, b: int) -> dict[str, int]:
+        return {"sum": a + b}
+
+    out = client.generate("1+2", tools=[add])
+
+    assert out == "3"
+    assert calls[1]["previous_response_id"] is None
+    assert calls[1]["messages"] == calls[0]["messages"]
 
 
 def test_generate_tool_failure_is_forwarded_to_model(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -275,5 +305,6 @@ def test_stream_supports_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert out == ["A", "B"]
     assert calls[1]["previous_response_id"] == "resp_1"
+    assert calls[1]["messages"] == []
     tool_results = calls[1]["tool_results"]
     assert tool_results[0].output == {"sum": 3}
