@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from conftest import InMemoryTokenStore
 from oauth_codex import Client
@@ -14,6 +14,11 @@ class ToolInputWithDescription(BaseModel):
 
 class ToolInput(BaseModel):
     query: str
+
+
+class StructuredOutput(BaseModel):
+    answer: str
+    count: int
 
 
 def _client() -> Client:
@@ -277,6 +282,108 @@ def test_generate_raises_when_tool_round_limit_exceeded(monkeypatch: pytest.Monk
         client.generate("loop", tools=[loop])
 
 
+def test_generate_supports_structured_output_with_pydantic_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+    captured: dict[str, object] = {}
+
+    def fake_generate(**kwargs):
+        captured.update(kwargs)
+        return GenerateResult(
+            text='{"answer":"ok","count":1}',
+            tool_calls=[],
+            finish_reason="stop",
+            response_id="resp_1",
+        )
+
+    monkeypatch.setattr(client._engine, "generate", fake_generate)
+
+    out = client.generate("return json", output_schema=StructuredOutput)
+
+    assert out == {"answer": "ok", "count": 1}
+    response_format = captured["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["name"] == "StructuredOutput"
+    assert response_format["strict"] is True
+    assert response_format["schema"]["type"] == "object"
+    assert response_format["schema"]["additionalProperties"] is False
+    assert response_format["schema"]["required"] == ["answer", "count"]
+    assert captured["strict_output"] is True
+
+
+def test_generate_supports_structured_output_with_raw_schema_dict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+    captured: dict[str, object] = {}
+
+    def fake_generate(**kwargs):
+        captured.update(kwargs)
+        return GenerateResult(
+            text='{"ok":true}',
+            tool_calls=[],
+            finish_reason="stop",
+        )
+
+    monkeypatch.setattr(client._engine, "generate", fake_generate)
+
+    out = client.generate(
+        "return json",
+        output_schema={
+            "type": "object",
+            "properties": {"ok": {"type": "boolean"}},
+        },
+    )
+
+    assert out == {"ok": True}
+    response_format = captured["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["name"] == "output"
+    assert response_format["strict"] is True
+    assert response_format["schema"]["required"] == ["ok"]
+    assert response_format["schema"]["additionalProperties"] is False
+
+
+def test_generate_structured_output_rejects_invalid_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _client()
+
+    def fake_generate(**kwargs):
+        _ = kwargs
+        return GenerateResult(
+            text="not-json",
+            tool_calls=[],
+            finish_reason="stop",
+        )
+
+    monkeypatch.setattr(client._engine, "generate", fake_generate)
+
+    with pytest.raises(ValueError, match="valid JSON"):
+        client.generate(
+            "return json",
+            output_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
+        )
+
+
+def test_generate_structured_output_enforces_pydantic_strict_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+
+    def fake_generate(**kwargs):
+        _ = kwargs
+        return GenerateResult(
+            text='{"answer":"ok","count":"1"}',
+            tool_calls=[],
+            finish_reason="stop",
+        )
+
+    monkeypatch.setattr(client._engine, "generate", fake_generate)
+
+    with pytest.raises(ValidationError):
+        client.generate("return json", output_schema=StructuredOutput)
+
+
 def test_stream_supports_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
     client = _client()
     calls: list[dict[str, object]] = []
@@ -308,3 +415,31 @@ def test_stream_supports_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls[1]["messages"] == []
     tool_results = calls[1]["tool_results"]
     assert tool_results[0].output == {"sum": 3}
+
+
+def test_stream_accepts_output_schema_and_keeps_text_stream(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+    calls: list[dict[str, object]] = []
+
+    def fake_stream(**kwargs):
+        calls.append(kwargs)
+        yield StreamEvent(type="text_delta", delta="{", response_id="resp_1")
+        yield StreamEvent(type="text_delta", delta='"ok":true}', response_id="resp_1")
+        yield StreamEvent(type="done", response_id="resp_1")
+
+    monkeypatch.setattr(client._engine, "generate_stream", fake_stream)
+
+    out = list(
+        client.stream(
+            "return json",
+            output_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
+        )
+    )
+
+    assert out == ["{", '"ok":true}']
+    assert calls[0]["strict_output"] is True
+    response_format = calls[0]["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["strict"] is True

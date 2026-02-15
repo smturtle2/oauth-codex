@@ -14,9 +14,9 @@ client = Client()
 
 ## 핵심 메서드
 
-- `generate(...)`: 최종 텍스트를 반환합니다.
+- `generate(...)`: 최종 텍스트를 반환하며, `output_schema` 사용 시 JSON 객체를 반환합니다.
 - `stream(...)`: 텍스트 delta를 동기 이터레이터로 반환합니다.
-- `agenerate(...)`: async 텍스트 생성입니다.
+- `agenerate(...)`: async 텍스트 생성이며, `output_schema` 사용 시 JSON 객체를 반환합니다.
 - `astream(...)`: async 텍스트 스트림입니다.
 
 ## 공통 주요 옵션
@@ -27,6 +27,8 @@ client = Client()
 - `model`: 생략 시 기본 `gpt-5.3-codex`
 - `reasoning_effort`: `low | medium | high` (기본 `medium`)
 - `temperature`, `top_p`, `max_output_tokens`
+- `output_schema`: structured output용 Pydantic 모델 타입 또는 JSON schema dict
+- `strict_output`: 툴/출력 스키마 strict 모드. `output_schema` 지정 시 기본 `True`
 
 ## 텍스트 생성
 
@@ -74,6 +76,35 @@ text = client.generate("툴을 사용해줘", tools=[tool])
 ```
 
 툴 실행 예외는 `{ "error": "..." }` 형태로 모델에 전달되어 루프가 이어집니다.
+
+## Structured Output
+
+```python
+from pydantic import BaseModel
+
+
+class Summary(BaseModel):
+    title: str
+    score: int
+
+
+out = client.generate("JSON을 반환해줘", output_schema=Summary)
+print(out)  # {"title": "...", "score": 1}
+```
+
+raw JSON schema dict도 지원합니다.
+
+```python
+out = client.generate(
+    "JSON을 반환해줘",
+    output_schema={
+        "type": "object",
+        "properties": {"ok": {"type": "boolean"}},
+    },
+)
+```
+
+`stream` / `astream`은 기존처럼 text delta만 반환합니다. structured JSON 파싱은 `generate` / `agenerate`에서만 수행됩니다.
 
 ## 스트리밍
 

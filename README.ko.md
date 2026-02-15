@@ -70,6 +70,44 @@ print(text)
 
 툴 실행 중 예외가 발생하면 SDK는 `{\"error\": ...}` 형태로 모델에 전달하고 루프를 계속 진행합니다.
 
+## Structured Output (Strict JSON Schema / Pydantic)
+
+`generate` / `agenerate`는 `output_schema`로 검증된 JSON 객체 출력을 받을 수 있습니다.
+
+```python
+from pydantic import BaseModel
+from oauth_codex import Client
+
+
+class Summary(BaseModel):
+    title: str
+    score: int
+
+
+client = Client()
+out = client.generate(
+    "title, score 키를 가진 JSON을 반환해줘",
+    output_schema=Summary,
+)
+print(out)  # {"title": "...", "score": 1}
+```
+
+raw JSON schema 객체를 직접 전달할 수도 있습니다.
+
+```python
+out = client.generate(
+    "{\"ok\": true} 형태 JSON을 반환해줘",
+    output_schema={
+        "type": "object",
+        "properties": {"ok": {"type": "boolean"}},
+    },
+)
+print(out)  # {"ok": True}
+```
+
+`output_schema`를 지정하면 `strict_output`을 따로 주지 않는 한 strict 모드가 기본 활성화됩니다.
+`stream` / `astream`은 기존처럼 text delta만 반환하며 최종 JSON 객체 파싱은 하지 않습니다.
+
 ## Async
 
 ```python

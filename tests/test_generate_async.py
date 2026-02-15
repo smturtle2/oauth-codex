@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from conftest import InMemoryTokenStore
 from oauth_codex import Client
@@ -10,6 +10,11 @@ from oauth_codex.core_types import GenerateResult, OAuthTokens, StreamEvent, Too
 
 class ToolInput(BaseModel):
     query: str
+
+
+class StructuredOutput(BaseModel):
+    answer: str
+    count: int
 
 
 def _client() -> Client:
@@ -117,3 +122,108 @@ async def test_agenerate_supports_single_pydantic_tool_input(monkeypatch: pytest
     assert out == "done"
     tool_results = calls[1]["tool_results"]
     assert tool_results[0].output == {"output": "Tool received query: hello"}
+
+
+@pytest.mark.asyncio
+async def test_agenerate_supports_structured_output_with_pydantic_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+    captured: dict[str, object] = {}
+
+    async def fake_agenerate(**kwargs):
+        captured.update(kwargs)
+        return GenerateResult(
+            text='{"answer":"ok","count":1}',
+            tool_calls=[],
+            finish_reason="stop",
+            response_id="resp_1",
+        )
+
+    monkeypatch.setattr(client._engine, "agenerate", fake_agenerate)
+
+    out = await client.agenerate("return json", output_schema=StructuredOutput)
+
+    assert out == {"answer": "ok", "count": 1}
+    response_format = captured["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["name"] == "StructuredOutput"
+    assert response_format["strict"] is True
+    assert response_format["schema"]["required"] == ["answer", "count"]
+    assert captured["strict_output"] is True
+
+
+@pytest.mark.asyncio
+async def test_agenerate_structured_output_rejects_invalid_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+
+    async def fake_agenerate(**kwargs):
+        _ = kwargs
+        return GenerateResult(
+            text="not-json",
+            tool_calls=[],
+            finish_reason="stop",
+        )
+
+    monkeypatch.setattr(client._engine, "agenerate", fake_agenerate)
+
+    with pytest.raises(ValueError, match="valid JSON"):
+        await client.agenerate(
+            "return json",
+            output_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
+        )
+
+
+@pytest.mark.asyncio
+async def test_agenerate_structured_output_enforces_pydantic_strict_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+
+    async def fake_agenerate(**kwargs):
+        _ = kwargs
+        return GenerateResult(
+            text='{"answer":"ok","count":"1"}',
+            tool_calls=[],
+            finish_reason="stop",
+        )
+
+    monkeypatch.setattr(client._engine, "agenerate", fake_agenerate)
+
+    with pytest.raises(ValidationError):
+        await client.agenerate("return json", output_schema=StructuredOutput)
+
+
+@pytest.mark.asyncio
+async def test_astream_accepts_output_schema_and_keeps_text_stream(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+    calls: list[dict[str, object]] = []
+
+    async def fake_astream(**kwargs):
+        calls.append(kwargs)
+
+        async def events():
+            yield StreamEvent(type="text_delta", delta="{", response_id="resp_1")
+            yield StreamEvent(type="text_delta", delta='"ok":true}', response_id="resp_1")
+            yield StreamEvent(type="done", response_id="resp_1")
+
+        return events()
+
+    monkeypatch.setattr(client._engine, "agenerate_stream", fake_astream)
+
+    out: list[str] = []
+    async for delta in client.astream(
+        "return json",
+        output_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
+    ):
+        out.append(delta)
+
+    assert out == ["{", '"ok":true}']
+    assert calls[0]["strict_output"] is True
+    response_format = calls[0]["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["strict"] is True

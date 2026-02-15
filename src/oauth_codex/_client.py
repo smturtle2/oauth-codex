@@ -22,10 +22,11 @@ from .core_types import (
     ToolResult,
 )
 from .store import FallbackTokenStore
-from .tooling import callable_to_tool_schema, normalize_tool_output
+from .tooling import build_strict_response_format, callable_to_tool_schema, normalize_tool_output
 
 DEFAULT_MODEL = "gpt-5.3-codex"
 DEFAULT_MAX_TOOL_ROUNDS = 16
+StructuredOutputSchema = type[BaseModel] | dict[str, Any]
 
 
 class OAuthCodexClient(SyncAPIClient):
@@ -96,9 +97,15 @@ class OAuthCodexClient(SyncAPIClient):
         temperature: float | None = None,
         top_p: float | None = None,
         max_output_tokens: int | None = None,
-    ) -> str:
+        output_schema: StructuredOutputSchema | None = None,
+        strict_output: bool | None = None,
+    ) -> str | dict[str, Any]:
         messages = self._build_messages(prompt=prompt, images=images)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
+        response_format, effective_strict_output = self._resolve_structured_output_options(
+            output_schema=output_schema,
+            strict_output=strict_output,
+        )
 
         previous_response_id: str | None = None
         tool_results: list[ToolResult] | None = None
@@ -114,6 +121,8 @@ class OAuthCodexClient(SyncAPIClient):
                 ),
                 tools=normalized_tools,
                 tool_results=tool_results,
+                response_format=response_format,
+                strict_output=effective_strict_output,
                 reasoning={"effort": reasoning_effort},
                 previous_response_id=previous_response_id,
                 temperature=temperature,
@@ -128,7 +137,10 @@ class OAuthCodexClient(SyncAPIClient):
                 output_parts.append(result.text)
 
             if not result.tool_calls:
-                return "".join(output_parts)
+                text = "".join(output_parts)
+                if output_schema is None:
+                    return text
+                return self._parse_structured_output_text(text=text, output_schema=output_schema)
 
             tool_results = self._execute_tool_calls_sync(result.tool_calls, tools_by_name)
             previous_response_id = result.response_id
@@ -146,9 +158,15 @@ class OAuthCodexClient(SyncAPIClient):
         temperature: float | None = None,
         top_p: float | None = None,
         max_output_tokens: int | None = None,
-    ) -> str:
+        output_schema: StructuredOutputSchema | None = None,
+        strict_output: bool | None = None,
+    ) -> str | dict[str, Any]:
         messages = self._build_messages(prompt=prompt, images=images)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
+        response_format, effective_strict_output = self._resolve_structured_output_options(
+            output_schema=output_schema,
+            strict_output=strict_output,
+        )
 
         previous_response_id: str | None = None
         tool_results: list[ToolResult] | None = None
@@ -164,6 +182,8 @@ class OAuthCodexClient(SyncAPIClient):
                 ),
                 tools=normalized_tools,
                 tool_results=tool_results,
+                response_format=response_format,
+                strict_output=effective_strict_output,
                 reasoning={"effort": reasoning_effort},
                 previous_response_id=previous_response_id,
                 temperature=temperature,
@@ -178,7 +198,10 @@ class OAuthCodexClient(SyncAPIClient):
                 output_parts.append(result.text)
 
             if not result.tool_calls:
-                return "".join(output_parts)
+                text = "".join(output_parts)
+                if output_schema is None:
+                    return text
+                return self._parse_structured_output_text(text=text, output_schema=output_schema)
 
             tool_results = await self._execute_tool_calls_async(result.tool_calls, tools_by_name)
             previous_response_id = result.response_id
@@ -196,9 +219,15 @@ class OAuthCodexClient(SyncAPIClient):
         temperature: float | None = None,
         top_p: float | None = None,
         max_output_tokens: int | None = None,
+        output_schema: StructuredOutputSchema | None = None,
+        strict_output: bool | None = None,
     ) -> Iterator[str]:
         messages = self._build_messages(prompt=prompt, images=images)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
+        response_format, effective_strict_output = self._resolve_structured_output_options(
+            output_schema=output_schema,
+            strict_output=strict_output,
+        )
 
         previous_response_id: str | None = None
         tool_results: list[ToolResult] | None = None
@@ -215,6 +244,8 @@ class OAuthCodexClient(SyncAPIClient):
                 ),
                 tools=normalized_tools,
                 tool_results=tool_results,
+                response_format=response_format,
+                strict_output=effective_strict_output,
                 reasoning={"effort": reasoning_effort},
                 previous_response_id=previous_response_id,
                 temperature=temperature,
@@ -249,9 +280,15 @@ class OAuthCodexClient(SyncAPIClient):
         temperature: float | None = None,
         top_p: float | None = None,
         max_output_tokens: int | None = None,
+        output_schema: StructuredOutputSchema | None = None,
+        strict_output: bool | None = None,
     ) -> AsyncIterator[str]:
         messages = self._build_messages(prompt=prompt, images=images)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
+        response_format, effective_strict_output = self._resolve_structured_output_options(
+            output_schema=output_schema,
+            strict_output=strict_output,
+        )
 
         previous_response_id: str | None = None
         tool_results: list[ToolResult] | None = None
@@ -268,6 +305,8 @@ class OAuthCodexClient(SyncAPIClient):
                 ),
                 tools=normalized_tools,
                 tool_results=tool_results,
+                response_format=response_format,
+                strict_output=effective_strict_output,
                 reasoning={"effort": reasoning_effort},
                 previous_response_id=previous_response_id,
                 temperature=temperature,
@@ -293,6 +332,37 @@ class OAuthCodexClient(SyncAPIClient):
 
     def _resolve_model(self, model: str | None) -> str:
         return model or self.default_model
+
+    def _resolve_structured_output_options(
+        self,
+        *,
+        output_schema: StructuredOutputSchema | None,
+        strict_output: bool | None,
+    ) -> tuple[dict[str, Any] | None, bool]:
+        effective_strict_output = strict_output if strict_output is not None else bool(output_schema)
+        if output_schema is None:
+            return None, effective_strict_output
+        return build_strict_response_format(output_schema), effective_strict_output
+
+    def _parse_structured_output_text(
+        self,
+        *,
+        text: str,
+        output_schema: StructuredOutputSchema,
+    ) -> dict[str, Any]:
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("structured output is not valid JSON") from exc
+
+        if not isinstance(parsed, dict):
+            raise TypeError("structured output must be a JSON object")
+
+        model_type = self._resolve_pydantic_model_type(output_schema)
+        if model_type is None:
+            return parsed
+        validated = model_type.model_validate(parsed, strict=True)
+        return validated.model_dump(mode="json")
 
     def _is_tool_continuation_round(
         self,

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.0
+
+### Added
+
+- Public structured output support on `Client.generate/agenerate/stream/astream`:
+  - new `output_schema` option (Pydantic model type or JSON schema dict)
+  - new `strict_output` option (`output_schema` is strict by default)
+- `generate/agenerate` now parse structured output into a JSON object when `output_schema` is set.
+- Strict JSON schema utilities for response formats and tool parameter schemas.
+
 ## 2.0.0
 
 ### Breaking

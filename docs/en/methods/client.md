@@ -14,9 +14,9 @@ client = Client()
 
 ## Core Methods
 
-- `generate(...)`: returns final text output.
+- `generate(...)`: returns final text output, or a JSON object when `output_schema` is set.
 - `stream(...)`: yields text deltas (sync iterator).
-- `agenerate(...)`: async text generation.
+- `agenerate(...)`: async text generation, or a JSON object when `output_schema` is set.
 - `astream(...)`: async text streaming.
 
 ## Common Options
@@ -27,6 +27,8 @@ client = Client()
 - `model`: defaults to `gpt-5.3-codex`
 - `reasoning_effort`: `low | medium | high` (default `medium`)
 - `temperature`, `top_p`, `max_output_tokens`
+- `output_schema`: Pydantic model type or JSON schema dict for structured output
+- `strict_output`: strict mode for tool and output schemas. Defaults to `True` when `output_schema` is set.
 
 ## Text Generation
 
@@ -74,6 +76,35 @@ text = client.generate("Use the tool", tools=[tool])
 ```
 
 Tool exceptions are forwarded to the model as `{ "error": "..." }` and the loop continues.
+
+## Structured Output
+
+```python
+from pydantic import BaseModel
+
+
+class Summary(BaseModel):
+    title: str
+    score: int
+
+
+out = client.generate("Return JSON", output_schema=Summary)
+print(out)  # {"title": "...", "score": 1}
+```
+
+Raw JSON schema dict is also supported:
+
+```python
+out = client.generate(
+    "Return JSON",
+    output_schema={
+        "type": "object",
+        "properties": {"ok": {"type": "boolean"}},
+    },
+)
+```
+
+`stream` / `astream` keep returning text deltas only. Structured JSON parsing is applied only in `generate` / `agenerate`.
 
 ## Streaming
 
