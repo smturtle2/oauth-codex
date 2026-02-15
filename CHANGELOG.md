@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0
+
+### Breaking
+
+- 미지원 리소스/메서드 하드 삭제
+  - 제거 리소스: `completions`, `chat`, `embeddings`, `images`, `audio`, `moderations`, `fine_tuning`, `beta`, `batches`, `uploads`, `realtime`, `conversations`, `evals`, `containers`, `videos`, `webhooks`
+  - 제거 메서드: `responses.retrieve/cancel/delete/compact/parse`, `responses.input_items.*`, `models.delete`, `vector_stores.files.update`
+- legacy 모듈 삭제: `oauth_codex.legacy_types`, `oauth_codex.legacy_auth`, `oauth_codex.client`
+- legacy 타입은 `oauth_codex.core_types`로 대체
+- legacy 에러 alias 삭제: `LLMRequestError`, `CodexOAuthLLMError`
+- 스트림 이벤트 alias `tool_call_delta` 제거 (`tool_call_arguments_delta`만 유지)
+
 ## 1.0.0
 
 ### Breaking

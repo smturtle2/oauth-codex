@@ -8,7 +8,7 @@ import pytest
 from conftest import InMemoryTokenStore
 from oauth_codex import AsyncOAuthCodexClient, OAuthCodexClient
 from oauth_codex._module_client import _reset_client
-from oauth_codex.legacy_types import OAuthTokens, ResponseCompat, StreamEvent
+from oauth_codex.core_types import OAuthTokens, ResponseCompat, StreamEvent
 
 
 def _sync_client() -> OAuthCodexClient:
@@ -253,3 +253,31 @@ def test_vector_store_methods_forward_named_and_extra(monkeypatch: pytest.Monkey
     assert search_payload["ranking_options"] == {"ranker": "default_2024_08_21"}
     assert search_payload["rewrite_query"] is True
     assert search_payload["custom_search"] is True
+
+
+def test_removed_methods_absent() -> None:
+    client = _sync_client()
+    assert not hasattr(client.responses, "retrieve")
+    assert not hasattr(client.responses, "cancel")
+    assert not hasattr(client.responses, "delete")
+    assert not hasattr(client.responses, "compact")
+    assert not hasattr(client.responses, "parse")
+    assert not hasattr(client.responses, "input_items")
+    assert not hasattr(client.models, "delete")
+    assert not hasattr(client.vector_stores.files, "update")
+
+
+def test_stream_events_do_not_emit_tool_call_delta_alias() -> None:
+    client = _sync_client()
+    events = client._engine._map_responses_stream(
+        "response.function_call_arguments.delta",
+        {
+            "type": "response.function_call_arguments.delta",
+            "id": "call_1",
+            "name": "tool_1",
+            "delta": "{\"a\":",
+        },
+    )
+    event_types = [event.type for event in events]
+    assert "tool_call_arguments_delta" in event_types
+    assert "tool_call_delta" not in event_types

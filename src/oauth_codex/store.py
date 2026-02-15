@@ -8,12 +8,10 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .legacy_types import OAuthTokens, TokenStore
+from .core_types import OAuthTokens, TokenStore
 
 DEFAULT_FILE_PATH = Path.home() / ".oauth_codex" / "auth.json"
-LEGACY_FILE_PATH = Path.home() / ".codex_oauth_llm" / "auth.json"
 DEFAULT_KEYRING_SERVICE = "oauth-codex"
-LEGACY_KEYRING_SERVICE = "codex-oauth-llm"
 
 
 def _tokens_from_payload(payload: dict[str, Any]) -> OAuthTokens:
@@ -31,15 +29,12 @@ def _tokens_from_payload(payload: dict[str, Any]) -> OAuthTokens:
 
 
 def _tokens_to_payload(tokens: OAuthTokens) -> dict[str, Any]:
-    payload = asdict(tokens)
-    return payload
+    return asdict(tokens)
 
 
 class FileTokenStore(TokenStore):
     def __init__(self, path: str | Path | None = None) -> None:
-        if path is None:
-            path = DEFAULT_FILE_PATH
-        self.path = Path(path).expanduser()
+        self.path = Path(path or DEFAULT_FILE_PATH).expanduser()
 
     def load(self) -> OAuthTokens | None:
         if not self.path.exists():
@@ -55,9 +50,7 @@ class FileTokenStore(TokenStore):
     def save(self, tokens: OAuthTokens) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-        payload = _tokens_to_payload(tokens)
-        serialized = json.dumps(payload, ensure_ascii=True, indent=2)
-
+        serialized = json.dumps(_tokens_to_payload(tokens), ensure_ascii=True, indent=2)
         with tempfile.NamedTemporaryFile(
             mode="w", encoding="utf-8", dir=str(self.path.parent), delete=False
         ) as fp:
@@ -98,8 +91,11 @@ class KeyringTokenStore(TokenStore):
 
     def save(self, tokens: OAuthTokens) -> None:
         keyring = self._require_keyring()
-        payload = _tokens_to_payload(tokens)
-        keyring.set_password(self.service_name, self.username, json.dumps(payload, ensure_ascii=True))
+        keyring.set_password(
+            self.service_name,
+            self.username,
+            json.dumps(_tokens_to_payload(tokens), ensure_ascii=True),
+        )
 
     def delete(self) -> None:
         keyring = self._require_keyring()
@@ -114,15 +110,9 @@ class FallbackTokenStore(TokenStore):
         self,
         keyring_store: TokenStore | None = None,
         file_store: TokenStore | None = None,
-        legacy_keyring_store: TokenStore | None = None,
-        legacy_file_store: TokenStore | None = None,
     ) -> None:
         self.keyring_store = keyring_store or KeyringTokenStore(service_name=DEFAULT_KEYRING_SERVICE)
         self.file_store = file_store or FileTokenStore(path=DEFAULT_FILE_PATH)
-        self.legacy_keyring_store = legacy_keyring_store or KeyringTokenStore(
-            service_name=LEGACY_KEYRING_SERVICE
-        )
-        self.legacy_file_store = legacy_file_store or FileTokenStore(path=LEGACY_FILE_PATH)
 
     def _safe_load(self, store: TokenStore) -> OAuthTokens | None:
         try:
@@ -136,36 +126,11 @@ class FallbackTokenStore(TokenStore):
         except Exception:
             return
 
-    def _migrate_legacy_tokens(self, tokens: OAuthTokens, legacy_store: TokenStore) -> OAuthTokens:
-        migrated = False
-        try:
-            self.save(tokens)
-            migrated = True
-        except Exception:
-            migrated = False
-
-        if migrated:
-            self._safe_delete(legacy_store)
-        return tokens
-
     def load(self) -> OAuthTokens | None:
         tokens = self._safe_load(self.keyring_store)
         if tokens:
             return tokens
-
-        tokens = self._safe_load(self.file_store)
-        if tokens:
-            return tokens
-
-        tokens = self._safe_load(self.legacy_keyring_store)
-        if tokens:
-            return self._migrate_legacy_tokens(tokens, self.legacy_keyring_store)
-
-        tokens = self._safe_load(self.legacy_file_store)
-        if tokens:
-            return self._migrate_legacy_tokens(tokens, self.legacy_file_store)
-
-        return None
+        return self._safe_load(self.file_store)
 
     def save(self, tokens: OAuthTokens) -> None:
         try:
@@ -177,5 +142,3 @@ class FallbackTokenStore(TokenStore):
     def delete(self) -> None:
         self._safe_delete(self.keyring_store)
         self._safe_delete(self.file_store)
-        self._safe_delete(self.legacy_keyring_store)
-        self._safe_delete(self.legacy_file_store)

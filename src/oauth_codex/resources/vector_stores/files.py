@@ -6,7 +6,6 @@ import uuid
 from typing import Any
 
 from ..._resource import AsyncAPIResource, SyncAPIResource
-from .._unsupported import raise_unsupported
 from .._wrappers import (
     async_to_raw_response_wrapper,
     async_to_streamed_response_wrapper,
@@ -144,9 +143,6 @@ class Files(SyncAPIResource):
     def content(self, vector_store_id: str, file_id: str, **kwargs: Any) -> bytes:
         _ = vector_store_id
         return self._client.files.content(file_id, **kwargs)
-
-    def update(self, *_: Any, **__: Any) -> VectorStoreFile:
-        raise_unsupported("vector_stores.files.update")
 
     def poll(self, vector_store_id: str, file_id: str, **kwargs: Any) -> VectorStoreFile:
         return self.retrieve(vector_store_id, file_id, **kwargs)
@@ -294,9 +290,6 @@ class AsyncFiles(AsyncAPIResource):
         _ = vector_store_id
         return await self._client.files.content(file_id, **kwargs)
 
-    async def update(self, *_: Any, **__: Any) -> VectorStoreFile:
-        raise_unsupported("vector_stores.files.update")
-
     async def poll(self, vector_store_id: str, file_id: str, **kwargs: Any) -> VectorStoreFile:
         return await self.retrieve(vector_store_id, file_id, **kwargs)
 
@@ -331,7 +324,6 @@ class FilesWithRawResponse:
         self.list = to_raw_response_wrapper(files.list)
         self.delete = to_raw_response_wrapper(files.delete)
         self.content = to_raw_response_wrapper(files.content)
-        self.update = to_raw_response_wrapper(files.update)
         self.poll = to_raw_response_wrapper(files.poll)
         self.upload = to_raw_response_wrapper(files.upload)
         self.upload_and_poll = to_raw_response_wrapper(files.upload_and_poll)
@@ -345,7 +337,6 @@ class AsyncFilesWithRawResponse:
         self.list = async_to_raw_response_wrapper(files.list)
         self.delete = async_to_raw_response_wrapper(files.delete)
         self.content = async_to_raw_response_wrapper(files.content)
-        self.update = async_to_raw_response_wrapper(files.update)
         self.poll = async_to_raw_response_wrapper(files.poll)
         self.upload = async_to_raw_response_wrapper(files.upload)
         self.upload_and_poll = async_to_raw_response_wrapper(files.upload_and_poll)
@@ -359,7 +350,6 @@ class FilesWithStreamingResponse:
         self.list = to_streamed_response_wrapper(files.list)
         self.delete = to_streamed_response_wrapper(files.delete)
         self.content = to_streamed_response_wrapper(files.content)
-        self.update = to_streamed_response_wrapper(files.update)
         self.poll = to_streamed_response_wrapper(files.poll)
         self.upload = to_streamed_response_wrapper(files.upload)
         self.upload_and_poll = to_streamed_response_wrapper(files.upload_and_poll)
@@ -373,7 +363,6 @@ class AsyncFilesWithStreamingResponse:
         self.list = async_to_streamed_response_wrapper(files.list)
         self.delete = async_to_streamed_response_wrapper(files.delete)
         self.content = async_to_streamed_response_wrapper(files.content)
-        self.update = async_to_streamed_response_wrapper(files.update)
         self.poll = async_to_streamed_response_wrapper(files.poll)
         self.upload = async_to_streamed_response_wrapper(files.upload)
         self.upload_and_poll = async_to_streamed_response_wrapper(files.upload_and_poll)

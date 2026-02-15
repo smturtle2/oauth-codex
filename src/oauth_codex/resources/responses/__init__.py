@@ -1,11 +1,3 @@
-from .input_items import (
-    AsyncInputItems,
-    AsyncInputItemsWithRawResponse,
-    AsyncInputItemsWithStreamingResponse,
-    InputItems,
-    InputItemsWithRawResponse,
-    InputItemsWithStreamingResponse,
-)
 from .input_tokens import (
     AsyncInputTokens,
     AsyncInputTokensWithRawResponse,
@@ -24,12 +16,6 @@ from .responses import (
 )
 
 __all__ = [
-    "InputItems",
-    "AsyncInputItems",
-    "InputItemsWithRawResponse",
-    "AsyncInputItemsWithRawResponse",
-    "InputItemsWithStreamingResponse",
-    "AsyncInputItemsWithStreamingResponse",
     "InputTokens",
     "AsyncInputTokens",
     "InputTokensWithRawResponse",

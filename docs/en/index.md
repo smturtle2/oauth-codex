@@ -2,8 +2,6 @@
 
 # oauth-codex Documentation (English)
 
-This is the English documentation index for `oauth-codex`.
-
 ## Method Reference
 
 - [Responses Methods](methods/responses.md)
@@ -12,10 +10,6 @@ This is the English documentation index for `oauth-codex`.
 - [Models Methods](methods/models.md)
 - [Module-level Usage](methods/module_level.md)
 - [Request Options Deep Guide](methods/request_options.md)
-
-## Support Status
-
-- [Unsupported Resource Matrix](unsupported-matrix.md)
 
 ## Supplemental Docs
 

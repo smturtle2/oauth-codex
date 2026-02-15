@@ -6,7 +6,7 @@ from ...types.responses import Response, ResponseStreamEvent
 from ...types.shared import TokenUsage
 
 
-def usage_from_legacy(usage: Any) -> TokenUsage | None:
+def usage_from_engine(usage: Any) -> TokenUsage | None:
     if usage is None:
         return None
     return TokenUsage(
@@ -20,12 +20,12 @@ def usage_from_legacy(usage: Any) -> TokenUsage | None:
     )
 
 
-def response_from_legacy(resp: Any) -> Response:
+def response_from_engine(resp: Any) -> Response:
     return Response(
         id=getattr(resp, "id", ""),
         output=list(getattr(resp, "output", []) or []),
         output_text=getattr(resp, "output_text", "") or "",
-        usage=usage_from_legacy(getattr(resp, "usage", None)),
+        usage=usage_from_engine(getattr(resp, "usage", None)),
         error=getattr(resp, "error", None),
         reasoning_summary=getattr(resp, "reasoning_summary", None),
         reasoning_items=list(getattr(resp, "reasoning_items", []) or []),
@@ -36,11 +36,11 @@ def response_from_legacy(resp: Any) -> Response:
     )
 
 
-def event_from_legacy(event: Any) -> ResponseStreamEvent:
+def event_from_engine(event: Any) -> ResponseStreamEvent:
     return ResponseStreamEvent(
         type=getattr(event, "type", "event"),
         delta=getattr(event, "delta", None),
-        usage=usage_from_legacy(getattr(event, "usage", None)),
+        usage=usage_from_engine(getattr(event, "usage", None)),
         raw=getattr(event, "raw", None),
         error=getattr(event, "error", None),
         call_id=getattr(event, "call_id", None),
@@ -50,11 +50,11 @@ def event_from_legacy(event: Any) -> ResponseStreamEvent:
     )
 
 
-def iter_events(events: Iterator[Any]) -> Iterator[ResponseStreamEvent]:
+def iter_engine_events(events: Iterator[Any]) -> Iterator[ResponseStreamEvent]:
     for event in events:
-        yield event_from_legacy(event)
+        yield event_from_engine(event)
 
 
-async def aiter_events(events: AsyncIterator[Any]) -> AsyncIterator[ResponseStreamEvent]:
+async def aiter_engine_events(events: AsyncIterator[Any]) -> AsyncIterator[ResponseStreamEvent]:
     async for event in events:
-        yield event_from_legacy(event)
+        yield event_from_engine(event)

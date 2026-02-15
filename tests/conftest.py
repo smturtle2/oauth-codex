@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from oauth_codex.legacy_types import OAuthTokens
+from oauth_codex.core_types import OAuthTokens
 
 
 class InMemoryTokenStore:

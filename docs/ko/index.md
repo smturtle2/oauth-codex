@@ -2,8 +2,6 @@
 
 # oauth-codex 문서 인덱스 (한국어)
 
-`oauth-codex` 한국어 문서 진입점입니다.
-
 ## 메서드 레퍼런스
 
 - [Responses 메서드](methods/responses.md)
@@ -12,10 +10,6 @@
 - [Models 메서드](methods/models.md)
 - [모듈 레벨 사용법](methods/module_level.md)
 - [Request Options 심화 가이드](methods/request_options.md)
-
-## 지원 상태
-
-- [미지원 리소스 매트릭스](unsupported-matrix.md)
 
 ## 보조 문서
 

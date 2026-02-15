@@ -13,29 +13,35 @@ def test_public_client_exports() -> None:
 
 
 def test_module_level_resource_proxies_exist() -> None:
+    for name in ["responses", "files", "vector_stores", "models"]:
+        assert hasattr(oauth_codex, name)
+
+
+def test_removed_resources_absent() -> None:
     for name in [
-        "responses",
-        "files",
-        "vector_stores",
-        "models",
+        "completions",
         "chat",
+        "embeddings",
         "images",
         "audio",
-        "embeddings",
+        "moderations",
+        "fine_tuning",
+        "beta",
         "batches",
         "uploads",
         "realtime",
-        "beta",
-        "fine_tuning",
-        "moderations",
+        "conversations",
         "evals",
         "containers",
         "videos",
         "webhooks",
     ]:
-        assert hasattr(oauth_codex, name)
+        assert not hasattr(oauth_codex, name)
 
 
-def test_legacy_alias_removed() -> None:
-    with pytest.raises(ImportError):
-        from oauth_codex import CodexOAuthLLM  # type: ignore[attr-defined]  # noqa: F401
+def test_legacy_modules_removed() -> None:
+    with pytest.raises(ModuleNotFoundError):
+        import oauth_codex.legacy_types  # noqa: F401
+
+    with pytest.raises(ModuleNotFoundError):
+        import oauth_codex.legacy_auth  # noqa: F401

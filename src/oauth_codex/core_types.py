@@ -97,7 +97,6 @@ class StreamEvent:
         "reasoning_done",
         "tool_call_started",
         "tool_call_arguments_delta",
-        "tool_call_delta",
         "tool_call_done",
         "usage",
         "response_completed",

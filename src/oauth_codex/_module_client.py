@@ -6,6 +6,8 @@ from ._client import OAuthCodexClient
 from .auth.config import OAuthConfig
 
 if TYPE_CHECKING:
+    from .resources.files import Files
+    from .resources.models import Models
     from .resources.responses.responses import Responses
     from .resources.vector_stores.vector_stores import VectorStores
 
@@ -79,28 +81,13 @@ class LazyProxy:
         return getattr(target, name)
 
 
-completions = LazyProxy("completions")
-chat = LazyProxy("chat")
-embeddings = LazyProxy("embeddings")
-files = LazyProxy("files")
-images = LazyProxy("images")
-audio = LazyProxy("audio")
-moderations = LazyProxy("moderations")
-models = LazyProxy("models")
-fine_tuning = LazyProxy("fine_tuning")
-beta = LazyProxy("beta")
-batches = LazyProxy("batches")
-uploads = LazyProxy("uploads")
-realtime = LazyProxy("realtime")
-conversations = LazyProxy("conversations")
-evals = LazyProxy("evals")
-containers = LazyProxy("containers")
-videos = LazyProxy("videos")
-webhooks = LazyProxy("webhooks")
-
 if TYPE_CHECKING:
-    vector_stores: VectorStores = cast(VectorStores, LazyProxy("vector_stores"))
     responses: Responses = cast(Responses, LazyProxy("responses"))
+    files: Files = cast(Files, LazyProxy("files"))
+    vector_stores: VectorStores = cast(VectorStores, LazyProxy("vector_stores"))
+    models: Models = cast(Models, LazyProxy("models"))
 else:
-    vector_stores = LazyProxy("vector_stores")
     responses = LazyProxy("responses")
+    files = LazyProxy("files")
+    vector_stores = LazyProxy("vector_stores")
+    models = LazyProxy("models")

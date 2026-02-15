@@ -1,10 +1,8 @@
-from .config import OAuthConfig
+from .config import OAuthConfig, load_oauth_config
 from .pkce import build_authorize_url, generate_pkce_pair, generate_state
 from .store import (
     DEFAULT_FILE_PATH,
     DEFAULT_KEYRING_SERVICE,
-    LEGACY_FILE_PATH,
-    LEGACY_KEYRING_SERVICE,
     FallbackTokenStore,
     FileTokenStore,
     KeyringTokenStore,
@@ -20,6 +18,7 @@ from .token_manager import (
 
 __all__ = [
     "OAuthConfig",
+    "load_oauth_config",
     "build_authorize_url",
     "generate_pkce_pair",
     "generate_state",
@@ -30,9 +29,7 @@ __all__ = [
     "refresh_tokens",
     "refresh_tokens_async",
     "DEFAULT_FILE_PATH",
-    "LEGACY_FILE_PATH",
     "DEFAULT_KEYRING_SERVICE",
-    "LEGACY_KEYRING_SERVICE",
     "FileTokenStore",
     "KeyringTokenStore",
     "FallbackTokenStore",

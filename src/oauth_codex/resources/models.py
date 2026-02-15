@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from .._resource import AsyncAPIResource, SyncAPIResource
-from ._unsupported import raise_unsupported
 from ._wrappers import (
     async_to_raw_response_wrapper,
     async_to_streamed_response_wrapper,
@@ -37,9 +36,6 @@ class Models(SyncAPIResource):
             "object": "list",
             "data": [self.retrieve("gpt-5.3-codex")],
         }
-
-    def delete(self, *_: Any, **__: Any) -> None:
-        raise_unsupported("models.delete")
 
     @property
     def with_raw_response(self) -> ModelsWithRawResponse:
@@ -75,9 +71,6 @@ class AsyncModels(AsyncAPIResource):
             "data": [await self.retrieve("gpt-5.3-codex")],
         }
 
-    async def delete(self, *_: Any, **__: Any) -> None:
-        raise_unsupported("models.delete")
-
     @property
     def with_raw_response(self) -> AsyncModelsWithRawResponse:
         return AsyncModelsWithRawResponse(self)
@@ -92,7 +85,6 @@ class ModelsWithRawResponse:
         self.capabilities = to_raw_response_wrapper(models.capabilities)
         self.retrieve = to_raw_response_wrapper(models.retrieve)
         self.list = to_raw_response_wrapper(models.list)
-        self.delete = to_raw_response_wrapper(models.delete)
 
 
 class AsyncModelsWithRawResponse:
@@ -100,7 +92,6 @@ class AsyncModelsWithRawResponse:
         self.capabilities = async_to_raw_response_wrapper(models.capabilities)
         self.retrieve = async_to_raw_response_wrapper(models.retrieve)
         self.list = async_to_raw_response_wrapper(models.list)
-        self.delete = async_to_raw_response_wrapper(models.delete)
 
 
 class ModelsWithStreamingResponse:
@@ -108,7 +99,6 @@ class ModelsWithStreamingResponse:
         self.capabilities = to_streamed_response_wrapper(models.capabilities)
         self.retrieve = to_streamed_response_wrapper(models.retrieve)
         self.list = to_streamed_response_wrapper(models.list)
-        self.delete = to_streamed_response_wrapper(models.delete)
 
 
 class AsyncModelsWithStreamingResponse:
@@ -116,4 +106,3 @@ class AsyncModelsWithStreamingResponse:
         self.capabilities = async_to_streamed_response_wrapper(models.capabilities)
         self.retrieve = async_to_streamed_response_wrapper(models.retrieve)
         self.list = async_to_streamed_response_wrapper(models.list)
-        self.delete = async_to_streamed_response_wrapper(models.delete)

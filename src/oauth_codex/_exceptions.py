@@ -174,8 +174,3 @@ class ToolCallRequiredError(OAuthCodexError):
         super().__init__(message)
         self.message = message
         self.tool_calls = tool_calls or []
-
-
-# Backward-compatible aliases for callers that still import legacy names.
-LLMRequestError = SDKRequestError
-CodexOAuthLLMError = OAuthCodexError

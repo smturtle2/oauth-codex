@@ -4,7 +4,7 @@ import pytest
 
 from conftest import InMemoryTokenStore
 from oauth_codex import AsyncOAuthCodexClient, OAuthCodexClient
-from oauth_codex.legacy_types import OAuthTokens, StreamEvent
+from oauth_codex.core_types import OAuthTokens, StreamEvent
 
 
 def _sync_client() -> OAuthCodexClient:

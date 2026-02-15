@@ -1,10 +1,4 @@
 from __future__ import annotations
-"""Legacy internal engine.
-
-This module keeps the pre-1.0 request/auth/stream implementation and is used by
-the new OpenAI-style surface in `oauth_codex._client` as an internal runtime
-backend. External users should import from package root (`oauth_codex`) only.
-"""
 
 import asyncio
 import json
@@ -17,14 +11,16 @@ from typing import Any, AsyncIterator, Callable, Iterator, Literal
 
 import httpx
 
-from .legacy_auth import (
+from .auth.config import OAuthConfig, load_oauth_config
+from .auth.pkce import (
     build_authorize_url,
+    generate_pkce_pair,
+    generate_state,
+)
+from .auth.token_manager import (
     discover_endpoints,
     discover_endpoints_async,
     exchange_code_for_tokens,
-    generate_pkce_pair,
-    generate_state,
-    load_oauth_config,
     parse_callback_url,
     refresh_tokens,
     refresh_tokens_async,
@@ -33,7 +29,6 @@ from .compat_store import LocalCompatStore
 from .errors import (
     AuthRequiredError,
     ContinuityError,
-    LLMRequestError,
     ModelValidationError,
     NotSupportedError,
     ParameterValidationError,
@@ -46,12 +41,11 @@ from .errors import (
 )
 from .store import FallbackTokenStore
 from .tooling import normalize_tool_inputs, to_responses_tools, tool_results_to_response_items
-from .legacy_types import (
+from .core_types import (
     GenerateResult,
     InputTokensCountResult,
     Message,
     ModelCapabilities,
-    OAuthConfig,
     OAuthTokens,
     ResponseCompat,
     StoreBehavior,
@@ -2775,16 +2769,6 @@ class OAuthCodexClient:
             out.append(
                 StreamEvent(
                     type="tool_call_arguments_delta",
-                    delta=delta if isinstance(delta, str) else None,
-                    call_id=call_id or None,
-                    response_id=response_id,
-                    raw=payload,
-                )
-            )
-            # Backward-compatible alias
-            out.append(
-                StreamEvent(
-                    type="tool_call_delta",
                     delta=delta if isinstance(delta, str) else None,
                     call_id=call_id or None,
                     response_id=response_id,

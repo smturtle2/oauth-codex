@@ -4,7 +4,7 @@ import io
 
 from conftest import InMemoryTokenStore
 from oauth_codex import OAuthCodexClient
-from oauth_codex.legacy_types import OAuthTokens
+from oauth_codex.core_types import OAuthTokens
 
 
 def _client(tmp_path) -> OAuthCodexClient:

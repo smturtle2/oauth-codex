@@ -3,7 +3,7 @@ from __future__ import annotations
 import oauth_codex
 from oauth_codex import OAuthCodexClient
 from oauth_codex._module_client import _load_client
-from oauth_codex.legacy_types import OAuthTokens, StreamEvent
+from oauth_codex.core_types import OAuthTokens, StreamEvent
 
 
 class InMemoryTokenStore:

@@ -5,16 +5,7 @@ from typing import Any, Mapping
 
 from ._base_client import AsyncAPIClient, SyncAPIClient
 from .auth.config import OAuthConfig
-from .client import OAuthCodexClient as _LegacyEngine
-from .resources.audio.audio import AsyncAudio, Audio
-from .resources.batches import AsyncBatches, Batches
-from .resources.beta.beta import AsyncBeta, Beta
-from .resources.chat.chat import AsyncChat, Chat
-from .resources.completions import AsyncCompletions, Completions
-from .resources.containers.containers import AsyncContainers, Containers
-from .resources.conversations.conversations import AsyncConversations, Conversations
-from .resources.embeddings import AsyncEmbeddings, Embeddings
-from .resources.evals.evals import AsyncEvals, Evals
+from ._engine import OAuthCodexClient as _EngineClient
 from .resources.files import (
     AsyncFiles,
     AsyncFilesWithRawResponse,
@@ -23,8 +14,6 @@ from .resources.files import (
     FilesWithRawResponse,
     FilesWithStreamingResponse,
 )
-from .resources.fine_tuning.fine_tuning import AsyncFineTuning, FineTuning
-from .resources.images import AsyncImages, Images
 from .resources.models import (
     AsyncModels,
     AsyncModelsWithRawResponse,
@@ -33,8 +22,6 @@ from .resources.models import (
     ModelsWithRawResponse,
     ModelsWithStreamingResponse,
 )
-from .resources.moderations import AsyncModerations, Moderations
-from .resources.realtime.realtime import AsyncRealtime, Realtime
 from .resources.responses.responses import (
     AsyncResponses,
     AsyncResponsesWithRawResponse,
@@ -43,7 +30,6 @@ from .resources.responses.responses import (
     ResponsesWithRawResponse,
     ResponsesWithStreamingResponse,
 )
-from .resources.uploads.uploads import AsyncUploads, Uploads
 from .resources.vector_stores.vector_stores import (
     AsyncVectorStores,
     AsyncVectorStoresWithRawResponse,
@@ -52,8 +38,6 @@ from .resources.vector_stores.vector_stores import (
     VectorStoresWithRawResponse,
     VectorStoresWithStreamingResponse,
 )
-from .resources.videos import AsyncVideos, Videos
-from .resources.webhooks import AsyncWebhooks, Webhooks
 from .store import FallbackTokenStore
 
 
@@ -82,11 +66,13 @@ class OAuthCodexClient(SyncAPIClient):
         super().__init__()
         _ = default_headers, default_query, http_client
 
-        resolved_base_url = (base_url or chatgpt_base_url or "https://chatgpt.com/backend-api/codex").rstrip("/")
+        resolved_base_url = (
+            base_url or chatgpt_base_url or "https://chatgpt.com/backend-api/codex"
+        ).rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
 
-        self._engine = _LegacyEngine(
+        self._engine = _EngineClient(
             oauth_config=oauth_config,
             token_store=token_store or FallbackTokenStore(),
             chatgpt_base_url=resolved_base_url,
@@ -117,70 +103,6 @@ class OAuthCodexClient(SyncAPIClient):
     @property
     def models(self) -> Models:
         return Models(self)
-
-    @property
-    def completions(self) -> Completions:
-        return Completions(self)
-
-    @property
-    def chat(self) -> Chat:
-        return Chat(self)
-
-    @property
-    def embeddings(self) -> Embeddings:
-        return Embeddings(self)
-
-    @property
-    def images(self) -> Images:
-        return Images(self)
-
-    @property
-    def audio(self) -> Audio:
-        return Audio(self)
-
-    @property
-    def moderations(self) -> Moderations:
-        return Moderations(self)
-
-    @property
-    def fine_tuning(self) -> FineTuning:
-        return FineTuning(self)
-
-    @property
-    def webhooks(self) -> Webhooks:
-        return Webhooks(self)
-
-    @property
-    def beta(self) -> Beta:
-        return Beta(self)
-
-    @property
-    def batches(self) -> Batches:
-        return Batches(self)
-
-    @property
-    def uploads(self) -> Uploads:
-        return Uploads(self)
-
-    @property
-    def realtime(self) -> Realtime:
-        return Realtime(self)
-
-    @property
-    def conversations(self) -> Conversations:
-        return Conversations(self)
-
-    @property
-    def evals(self) -> Evals:
-        return Evals(self)
-
-    @property
-    def containers(self) -> Containers:
-        return Containers(self)
-
-    @property
-    def videos(self) -> Videos:
-        return Videos(self)
 
     @property
     def with_raw_response(self) -> OAuthCodexClientWithRawResponse:
@@ -228,11 +150,13 @@ class AsyncOAuthCodexClient(AsyncAPIClient):
         super().__init__()
         _ = default_headers, default_query, http_client
 
-        resolved_base_url = (base_url or chatgpt_base_url or "https://chatgpt.com/backend-api/codex").rstrip("/")
+        resolved_base_url = (
+            base_url or chatgpt_base_url or "https://chatgpt.com/backend-api/codex"
+        ).rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
 
-        self._engine = _LegacyEngine(
+        self._engine = _EngineClient(
             oauth_config=oauth_config,
             token_store=token_store or FallbackTokenStore(),
             chatgpt_base_url=resolved_base_url,
@@ -263,70 +187,6 @@ class AsyncOAuthCodexClient(AsyncAPIClient):
     @property
     def models(self) -> AsyncModels:
         return AsyncModels(self)
-
-    @property
-    def completions(self) -> AsyncCompletions:
-        return AsyncCompletions(self)
-
-    @property
-    def chat(self) -> AsyncChat:
-        return AsyncChat(self)
-
-    @property
-    def embeddings(self) -> AsyncEmbeddings:
-        return AsyncEmbeddings(self)
-
-    @property
-    def images(self) -> AsyncImages:
-        return AsyncImages(self)
-
-    @property
-    def audio(self) -> AsyncAudio:
-        return AsyncAudio(self)
-
-    @property
-    def moderations(self) -> AsyncModerations:
-        return AsyncModerations(self)
-
-    @property
-    def fine_tuning(self) -> AsyncFineTuning:
-        return AsyncFineTuning(self)
-
-    @property
-    def webhooks(self) -> AsyncWebhooks:
-        return AsyncWebhooks(self)
-
-    @property
-    def beta(self) -> AsyncBeta:
-        return AsyncBeta(self)
-
-    @property
-    def batches(self) -> AsyncBatches:
-        return AsyncBatches(self)
-
-    @property
-    def uploads(self) -> AsyncUploads:
-        return AsyncUploads(self)
-
-    @property
-    def realtime(self) -> AsyncRealtime:
-        return AsyncRealtime(self)
-
-    @property
-    def conversations(self) -> AsyncConversations:
-        return AsyncConversations(self)
-
-    @property
-    def evals(self) -> AsyncEvals:
-        return AsyncEvals(self)
-
-    @property
-    def containers(self) -> AsyncContainers:
-        return AsyncContainers(self)
-
-    @property
-    def videos(self) -> AsyncVideos:
-        return AsyncVideos(self)
 
     @property
     def with_raw_response(self) -> AsyncOAuthCodexClientWithRawResponse:
