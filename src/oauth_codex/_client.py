@@ -20,7 +20,7 @@ from .core_types import (
     ToolResult,
 )
 from .store import FallbackTokenStore
-from .tooling import callable_to_tool_schema
+from .tooling import callable_to_tool_schema, normalize_tool_output
 
 DEFAULT_MODEL = "gpt-5.3-codex"
 DEFAULT_MAX_TOOL_ROUNDS = 8
@@ -364,7 +364,7 @@ class OAuthCodexClient(SyncAPIClient):
     ) -> list[ToolResult]:
         results: list[ToolResult] = []
         for call in tool_calls:
-            output: str | dict[str, Any]
+            output: dict[str, Any]
             tool = tools_by_name.get(call.name)
             if tool is None:
                 output = {"error": f"tool not found: {call.name}"}
@@ -387,7 +387,7 @@ class OAuthCodexClient(SyncAPIClient):
     ) -> list[ToolResult]:
         results: list[ToolResult] = []
         for call in tool_calls:
-            output: str | dict[str, Any]
+            output: dict[str, Any]
             tool = tools_by_name.get(call.name)
             if tool is None:
                 output = {"error": f"tool not found: {call.name}"}
@@ -411,15 +411,8 @@ class OAuthCodexClient(SyncAPIClient):
             raise TypeError("tool arguments must be a JSON object")
         return parsed
 
-    def _normalize_tool_output(self, output: Any) -> str | dict[str, Any]:
-        if isinstance(output, dict):
-            return output
-        if isinstance(output, str):
-            return output
-        try:
-            return json.dumps(output, ensure_ascii=True)
-        except TypeError:
-            return str(output)
+    def _normalize_tool_output(self, output: Any) -> dict[str, Any]:
+        return normalize_tool_output(output)
 
 
 Client = OAuthCodexClient

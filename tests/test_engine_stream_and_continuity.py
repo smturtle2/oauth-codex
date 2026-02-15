@@ -77,9 +77,7 @@ def test_map_stream_raises_when_call_id_cannot_be_restored() -> None:
 
 def test_tool_results_to_response_items_rejects_empty_tool_call_id() -> None:
     with pytest.raises(SDKRequestError) as exc_info:
-        tool_results_to_response_items(
-            [ToolResult(tool_call_id="  ", name="tool", output="This is a tool response.")]
-        )
+        tool_results_to_response_items([ToolResult(tool_call_id="  ", name="tool", output={"ok": True})])
     assert exc_info.value.provider_code == "invalid_tool_call_id"
 
 

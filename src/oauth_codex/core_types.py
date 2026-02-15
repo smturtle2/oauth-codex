@@ -78,7 +78,7 @@ class ToolCall:
 class ToolResult:
     tool_call_id: str
     name: str
-    output: str | dict[str, Any]
+    output: dict[str, Any]
 
 
 @dataclass

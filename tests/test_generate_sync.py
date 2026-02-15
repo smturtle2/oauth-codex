@@ -120,6 +120,33 @@ def test_generate_tool_failure_is_forwarded_to_model(monkeypatch: pytest.MonkeyP
     assert tool_results[0].output == {"error": "boom"}
 
 
+def test_generate_wraps_string_tool_output_as_dict(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _client()
+    calls: list[dict[str, object]] = []
+
+    def fake_generate(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return GenerateResult(
+                text="",
+                tool_calls=[ToolCall(id="call_1", name="echo", arguments_json='{"query":"hello"}')],
+                finish_reason="tool_calls",
+                response_id="resp_1",
+            )
+        return GenerateResult(text="done", tool_calls=[], finish_reason="stop", response_id="resp_2")
+
+    monkeypatch.setattr(client._engine, "generate", fake_generate)
+
+    def echo(query: str) -> str:
+        return query
+
+    out = client.generate("run once", tools=[echo])
+
+    assert out == "done"
+    tool_results = calls[1]["tool_results"]
+    assert tool_results[0].output == {"output": "hello"}
+
+
 def test_generate_raises_when_tool_round_limit_exceeded(monkeypatch: pytest.MonkeyPatch) -> None:
     client = _client()
     client.max_tool_rounds = 2

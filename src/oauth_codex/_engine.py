@@ -40,7 +40,12 @@ from .errors import (
     TokenRefreshError,
 )
 from .store import FallbackTokenStore
-from .tooling import normalize_tool_inputs, to_responses_tools, tool_results_to_response_items
+from .tooling import (
+    normalize_tool_inputs,
+    normalize_tool_output,
+    to_responses_tools,
+    tool_results_to_response_items,
+)
 from .core_types import (
     GenerateResult,
     InputTokensCountResult,
@@ -1408,14 +1413,20 @@ class OAuthCodexClient:
         normalized: list[ToolResult] = []
         for item in tool_results:
             if isinstance(item, ToolResult):
-                normalized.append(item)
+                normalized.append(
+                    ToolResult(
+                        tool_call_id=item.tool_call_id,
+                        name=item.name,
+                        output=normalize_tool_output(item.output),
+                    )
+                )
                 continue
             if isinstance(item, dict):
                 normalized.append(
                     ToolResult(
                         tool_call_id=str(item["tool_call_id"]),
                         name=str(item["name"]),
-                        output=item["output"],
+                        output=normalize_tool_output(item.get("output")),
                     )
                 )
                 continue

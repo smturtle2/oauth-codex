@@ -157,10 +157,20 @@ def to_responses_tools(
     return normalized
 
 
-def serialize_tool_output(output: str | dict[str, Any]) -> str:
-    if isinstance(output, str):
+def normalize_tool_output(output: Any) -> dict[str, Any]:
+    if isinstance(output, dict):
         return output
-    return json.dumps(output, ensure_ascii=True)
+    if isinstance(output, str):
+        return {"output": output}
+    try:
+        json.dumps(output, ensure_ascii=True)
+        return {"output": output}
+    except TypeError:
+        return {"output": str(output)}
+
+
+def serialize_tool_output(output: Any) -> str:
+    return json.dumps(normalize_tool_output(output), ensure_ascii=True)
 
 
 def tool_results_to_response_items(tool_results: list[ToolResult] | None) -> list[dict[str, Any]]:
