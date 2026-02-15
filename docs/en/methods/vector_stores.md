@@ -50,20 +50,51 @@ This page documents `vector_stores` runtime methods in `oauth-codex`.
 
 ```python
 # sync
-client.vector_stores.create(**payload) -> VectorStore
+client.vector_stores.create(
+    *,
+    name: str | None = None,
+    file_ids: list[str] | None = None,
+    metadata: dict[str, Any] | None = None,
+    expires_after: dict[str, Any] | None = None,
+    **payload,
+) -> VectorStore
 client.vector_stores.retrieve(vector_store_id: str) -> VectorStore
-client.vector_stores.update(vector_store_id: str, **payload) -> VectorStore
-client.vector_stores.list(**params) -> dict
+client.vector_stores.update(
+    vector_store_id: str,
+    *,
+    name: str | None = None,
+    file_ids: list[str] | None = None,
+    metadata: dict[str, Any] | None = None,
+    expires_after: dict[str, Any] | None = None,
+    **payload,
+) -> VectorStore
+client.vector_stores.list(
+    *,
+    after: str | None = None,
+    before: str | None = None,
+    limit: int | None = None,
+    order: str | None = None,
+    **params,
+) -> dict
 client.vector_stores.delete(vector_store_id: str) -> VectorStoreDeleted
-client.vector_stores.search(vector_store_id: str, *, query: str, **payload) -> dict
+client.vector_stores.search(
+    vector_store_id: str,
+    *,
+    query: str,
+    max_num_results: int | None = None,
+    filters: dict[str, Any] | None = None,
+    ranking_options: dict[str, Any] | None = None,
+    rewrite_query: bool | None = None,
+    **payload,
+) -> dict
 
 # async
-await client.vector_stores.create(**payload) -> VectorStore
+await client.vector_stores.create(...) -> VectorStore
 await client.vector_stores.retrieve(vector_store_id: str) -> VectorStore
-await client.vector_stores.update(vector_store_id: str, **payload) -> VectorStore
-await client.vector_stores.list(**params) -> dict
+await client.vector_stores.update(...) -> VectorStore
+await client.vector_stores.list(...) -> dict
 await client.vector_stores.delete(vector_store_id: str) -> VectorStoreDeleted
-await client.vector_stores.search(vector_store_id: str, *, query: str, **payload) -> dict
+await client.vector_stores.search(...) -> dict
 
 # module-level
 oauth_codex.vector_stores.create(...)
@@ -74,16 +105,37 @@ oauth_codex.vector_stores.delete(...)
 oauth_codex.vector_stores.search(...)
 ```
 
-### Parameters
+### Parameters (root methods)
 
-| Method | Parameters |
-|---|---|
-| `create` | Arbitrary payload fields accepted and forwarded/local-emulated (`name`, `file_ids`, `metadata`, etc.) |
-| `retrieve` | `vector_store_id: str` |
-| `update` | `vector_store_id: str` + payload fields |
-| `list` | Optional query-like params |
-| `delete` | `vector_store_id: str` |
-| `search` | `vector_store_id: str`, required `query: str`, optional payload (for example `max_num_results`) |
+| Method | Parameter | Type | Required | Default | Behavior |
+|---|---|---|---|---|---|
+| `create` | `name` | `str | None` | No | `None` | Vector store display name |
+| `create` | `file_ids` | `list[str] | None` | No | `None` | Initial file memberships |
+| `create` | `metadata` | `dict[str, Any] | None` | No | `None` | Metadata fields |
+| `create` | `expires_after` | `dict[str, Any] | None` | No | `None` | Expiration policy payload |
+| `create` | `**payload` | `dict` | No | - | Additional compatibility fields are forwarded |
+| `retrieve` | `vector_store_id` | `str` | Yes | - | Target vector store id |
+| `update` | `vector_store_id` | `str` | Yes | - | Target vector store id |
+| `update` | `name` | `str | None` | No | `None` | Update display name |
+| `update` | `file_ids` | `list[str] | None` | No | `None` | Replace memberships |
+| `update` | `metadata` | `dict[str, Any] | None` | No | `None` | Replace metadata |
+| `update` | `expires_after` | `dict[str, Any] | None` | No | `None` | Replace expiration policy |
+| `update` | `**payload` | `dict` | No | - | Additional compatibility fields are forwarded |
+| `list` | `after` | `str | None` | No | `None` | Cursor-like query input |
+| `list` | `before` | `str | None` | No | `None` | Cursor-like query input |
+| `list` | `limit` | `int | None` | No | `None` | Maximum items |
+| `list` | `order` | `str | None` | No | `None` | Ordering hint (`asc`/`desc`) |
+| `list` | `**params` | `dict` | No | - | Additional query-like compatibility fields |
+| `delete` | `vector_store_id` | `str` | Yes | - | Target vector store id |
+| `search` | `vector_store_id` | `str` | Yes | - | Target vector store id |
+| `search` | `query` | `str` | Yes | - | Search text |
+| `search` | `max_num_results` | `int | None` | No | `None` | Result count hint |
+| `search` | `filters` | `dict[str, Any] | None` | No | `None` | Provider filter payload |
+| `search` | `ranking_options` | `dict[str, Any] | None` | No | `None` | Provider ranking payload |
+| `search` | `rewrite_query` | `bool | None` | No | `None` | Provider query rewrite hint |
+| `search` | `**payload` | `dict` | No | - | Additional compatibility fields are forwarded |
+
+- Compatibility rule: explicit named parameters and extra `**payload/**params` are merged and sent together.
 
 ### Return Shapes
 

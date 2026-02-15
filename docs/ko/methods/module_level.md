@@ -90,6 +90,7 @@ resp = client.responses.create(model="gpt-5.3-codex", input="hello")
 ## Behavior Notes
 
 - 모듈 레벨 proxy는 sync client 동작을 따릅니다.
+- `oauth_codex.responses`, `oauth_codex.vector_stores`는 typed proxy 힌트를 제공해 IDE 시그니처 도움말에서 명시 파라미터가 노출됩니다.
 - 미지원 리소스도 표면 호환성을 위해 속성은 노출됩니다.
 - 비동기 동작이 필요하면 `AsyncOAuthCodexClient`를 직접 사용하세요.
 

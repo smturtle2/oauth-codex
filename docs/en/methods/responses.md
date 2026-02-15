@@ -24,13 +24,71 @@ This page documents `responses` runtime methods in `oauth-codex`.
 
 ```python
 # sync client
-client.responses.create(*, stream: bool = False, **kwargs) -> Response | Iterator[StreamEvent]
+client.responses.create(
+    *,
+    model: str,
+    input: str | dict | list[dict] | None = None,
+    messages: list[dict] | None = None,
+    tools: list | None = None,
+    tool_results: list | None = None,
+    response_format: dict | None = None,
+    tool_choice: str | dict | None = None,
+    strict_output: bool = False,
+    store: bool = False,
+    reasoning: dict | None = None,
+    previous_response_id: str | None = None,
+    instructions: str | None = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
+    max_output_tokens: int | None = None,
+    metadata: dict | None = None,
+    include: list[str] | None = None,
+    max_tool_calls: int | None = None,
+    parallel_tool_calls: bool | None = None,
+    truncation: Literal["auto", "disabled"] | None = None,
+    extra_headers: dict[str, str] | None = None,
+    extra_query: dict | None = None,
+    extra_body: dict | None = None,
+    service_tier: str | None = None,
+    stream: bool = False,
+    validation_mode: Literal["warn", "error", "ignore"] | None = None,
+    **extra,
+) -> Response | Iterator[StreamEvent]
 
 # async client
-await client.responses.create(*, stream: bool = False, **kwargs) -> Response | AsyncIterator[StreamEvent]
+await client.responses.create(
+    *,
+    model: str,
+    input: str | dict | list[dict] | None = None,
+    messages: list[dict] | None = None,
+    tools: list | None = None,
+    tool_results: list | None = None,
+    response_format: dict | None = None,
+    tool_choice: str | dict | None = None,
+    strict_output: bool = False,
+    store: bool = False,
+    reasoning: dict | None = None,
+    previous_response_id: str | None = None,
+    instructions: str | None = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
+    max_output_tokens: int | None = None,
+    metadata: dict | None = None,
+    include: list[str] | None = None,
+    max_tool_calls: int | None = None,
+    parallel_tool_calls: bool | None = None,
+    truncation: Literal["auto", "disabled"] | None = None,
+    extra_headers: dict[str, str] | None = None,
+    extra_query: dict | None = None,
+    extra_body: dict | None = None,
+    service_tier: str | None = None,
+    stream: bool = False,
+    validation_mode: Literal["warn", "error", "ignore"] | None = None,
+    **extra,
+) -> Response | AsyncIterator[StreamEvent]
 
 # module-level
-oauth_codex.responses.create(*, stream: bool = False, **kwargs)
+oauth_codex.responses.create(...)
 ```
 
 ### Parameters
@@ -183,13 +241,69 @@ for event in client.responses.stream(model="gpt-5.3-codex", input="stream this")
 
 ```python
 # sync client
-client.responses.stream(**kwargs) -> Iterator[StreamEvent]
+client.responses.stream(
+    *,
+    model: str,
+    input: str | dict | list[dict] | None = None,
+    messages: list[dict] | None = None,
+    tools: list | None = None,
+    tool_results: list | None = None,
+    response_format: dict | None = None,
+    tool_choice: str | dict | None = None,
+    strict_output: bool = False,
+    store: bool = False,
+    reasoning: dict | None = None,
+    previous_response_id: str | None = None,
+    instructions: str | None = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
+    max_output_tokens: int | None = None,
+    metadata: dict | None = None,
+    include: list[str] | None = None,
+    max_tool_calls: int | None = None,
+    parallel_tool_calls: bool | None = None,
+    truncation: Literal["auto", "disabled"] | None = None,
+    extra_headers: dict[str, str] | None = None,
+    extra_query: dict | None = None,
+    extra_body: dict | None = None,
+    service_tier: str | None = None,
+    validation_mode: Literal["warn", "error", "ignore"] | None = None,
+    **extra,
+) -> Iterator[StreamEvent]
 
 # async client
-await client.responses.stream(**kwargs) -> AsyncIterator[StreamEvent]
+await client.responses.stream(
+    *,
+    model: str,
+    input: str | dict | list[dict] | None = None,
+    messages: list[dict] | None = None,
+    tools: list | None = None,
+    tool_results: list | None = None,
+    response_format: dict | None = None,
+    tool_choice: str | dict | None = None,
+    strict_output: bool = False,
+    store: bool = False,
+    reasoning: dict | None = None,
+    previous_response_id: str | None = None,
+    instructions: str | None = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
+    max_output_tokens: int | None = None,
+    metadata: dict | None = None,
+    include: list[str] | None = None,
+    max_tool_calls: int | None = None,
+    parallel_tool_calls: bool | None = None,
+    truncation: Literal["auto", "disabled"] | None = None,
+    extra_headers: dict[str, str] | None = None,
+    extra_query: dict | None = None,
+    extra_body: dict | None = None,
+    service_tier: str | None = None,
+    validation_mode: Literal["warn", "error", "ignore"] | None = None,
+    **extra,
+) -> AsyncIterator[StreamEvent]
 
 # module-level
-oauth_codex.responses.stream(**kwargs)
+oauth_codex.responses.stream(...)
 ```
 
 ### Parameters

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ._client import OAuthCodexClient
 from .auth.config import OAuthConfig
+
+if TYPE_CHECKING:
+    from .resources.responses.responses import Responses
+    from .resources.vector_stores.vector_stores import VectorStores
 
 # Module-level configurable options.
 oauth_client_id: str | None = None
@@ -84,14 +88,19 @@ audio = LazyProxy("audio")
 moderations = LazyProxy("moderations")
 models = LazyProxy("models")
 fine_tuning = LazyProxy("fine_tuning")
-vector_stores = LazyProxy("vector_stores")
 beta = LazyProxy("beta")
 batches = LazyProxy("batches")
 uploads = LazyProxy("uploads")
 realtime = LazyProxy("realtime")
-responses = LazyProxy("responses")
 conversations = LazyProxy("conversations")
 evals = LazyProxy("evals")
 containers = LazyProxy("containers")
 videos = LazyProxy("videos")
 webhooks = LazyProxy("webhooks")
+
+if TYPE_CHECKING:
+    vector_stores: VectorStores = cast(VectorStores, LazyProxy("vector_stores"))
+    responses: Responses = cast(Responses, LazyProxy("responses"))
+else:
+    vector_stores = LazyProxy("vector_stores")
+    responses = LazyProxy("responses")

@@ -52,8 +52,25 @@ class VectorStores(SyncAPIResource):
     def file_batches(self) -> FileBatches:
         return FileBatches(self._client)
 
-    def create(self, **payload: Any) -> VectorStore:
-        out = self._client._engine.vector_store_request(method="POST", path="/vector_stores", payload=payload)
+    def create(
+        self,
+        *,
+        name: str | None = None,
+        file_ids: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        expires_after: dict[str, Any] | None = None,
+        **payload: Any,
+    ) -> VectorStore:
+        body: dict[str, Any] = dict(payload)
+        if name is not None:
+            body["name"] = name
+        if file_ids is not None:
+            body["file_ids"] = file_ids
+        if metadata is not None:
+            body["metadata"] = metadata
+        if expires_after is not None:
+            body["expires_after"] = expires_after
+        out = self._client._engine.vector_store_request(method="POST", path="/vector_stores", payload=body)
         return _to_vector_store(out)
 
     def retrieve(self, vector_store_id: str, **_: Any) -> VectorStore:
@@ -64,19 +81,54 @@ class VectorStores(SyncAPIResource):
         )
         return _to_vector_store(out)
 
-    def update(self, vector_store_id: str, **payload: Any) -> VectorStore:
+    def update(
+        self,
+        vector_store_id: str,
+        *,
+        name: str | None = None,
+        file_ids: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        expires_after: dict[str, Any] | None = None,
+        **payload: Any,
+    ) -> VectorStore:
+        body: dict[str, Any] = dict(payload)
+        if name is not None:
+            body["name"] = name
+        if file_ids is not None:
+            body["file_ids"] = file_ids
+        if metadata is not None:
+            body["metadata"] = metadata
+        if expires_after is not None:
+            body["expires_after"] = expires_after
         out = self._client._engine.vector_store_request(
             method="POST",
             path=f"/vector_stores/{vector_store_id}",
-            payload=payload,
+            payload=body,
         )
         return _to_vector_store(out)
 
-    def list(self, **params: Any) -> dict[str, Any]:
+    def list(
+        self,
+        *,
+        after: str | None = None,
+        before: str | None = None,
+        limit: int | None = None,
+        order: str | None = None,
+        **params: Any,
+    ) -> dict[str, Any]:
+        query: dict[str, Any] = dict(params)
+        if after is not None:
+            query["after"] = after
+        if before is not None:
+            query["before"] = before
+        if limit is not None:
+            query["limit"] = limit
+        if order is not None:
+            query["order"] = order
         out = self._client._engine.vector_store_request(
             method="GET",
             path="/vector_stores",
-            payload=params,
+            payload=query,
         )
         data = out.get("data")
         if isinstance(data, list):
@@ -98,11 +150,31 @@ class VectorStores(SyncAPIResource):
             deleted=bool(out.get("deleted", True)),
         )
 
-    def search(self, vector_store_id: str, *, query: str, **payload: Any) -> dict[str, Any]:
+    def search(
+        self,
+        vector_store_id: str,
+        *,
+        query: str,
+        max_num_results: int | None = None,
+        filters: dict[str, Any] | None = None,
+        ranking_options: dict[str, Any] | None = None,
+        rewrite_query: bool | None = None,
+        **payload: Any,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = dict(payload)
+        body["query"] = query
+        if max_num_results is not None:
+            body["max_num_results"] = max_num_results
+        if filters is not None:
+            body["filters"] = filters
+        if ranking_options is not None:
+            body["ranking_options"] = ranking_options
+        if rewrite_query is not None:
+            body["rewrite_query"] = rewrite_query
         return self._client._engine.vector_store_request(
             method="POST",
             path=f"/vector_stores/{vector_store_id}/search",
-            payload={"query": query, **payload},
+            payload=body,
         )
 
     @property
@@ -123,8 +195,25 @@ class AsyncVectorStores(AsyncAPIResource):
     def file_batches(self) -> AsyncFileBatches:
         return AsyncFileBatches(self._client)
 
-    async def create(self, **payload: Any) -> VectorStore:
-        out = await self._client._engine.avector_store_request(method="POST", path="/vector_stores", payload=payload)
+    async def create(
+        self,
+        *,
+        name: str | None = None,
+        file_ids: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        expires_after: dict[str, Any] | None = None,
+        **payload: Any,
+    ) -> VectorStore:
+        body: dict[str, Any] = dict(payload)
+        if name is not None:
+            body["name"] = name
+        if file_ids is not None:
+            body["file_ids"] = file_ids
+        if metadata is not None:
+            body["metadata"] = metadata
+        if expires_after is not None:
+            body["expires_after"] = expires_after
+        out = await self._client._engine.avector_store_request(method="POST", path="/vector_stores", payload=body)
         return _to_vector_store(out)
 
     async def retrieve(self, vector_store_id: str, **_: Any) -> VectorStore:
@@ -135,19 +224,54 @@ class AsyncVectorStores(AsyncAPIResource):
         )
         return _to_vector_store(out)
 
-    async def update(self, vector_store_id: str, **payload: Any) -> VectorStore:
+    async def update(
+        self,
+        vector_store_id: str,
+        *,
+        name: str | None = None,
+        file_ids: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        expires_after: dict[str, Any] | None = None,
+        **payload: Any,
+    ) -> VectorStore:
+        body: dict[str, Any] = dict(payload)
+        if name is not None:
+            body["name"] = name
+        if file_ids is not None:
+            body["file_ids"] = file_ids
+        if metadata is not None:
+            body["metadata"] = metadata
+        if expires_after is not None:
+            body["expires_after"] = expires_after
         out = await self._client._engine.avector_store_request(
             method="POST",
             path=f"/vector_stores/{vector_store_id}",
-            payload=payload,
+            payload=body,
         )
         return _to_vector_store(out)
 
-    async def list(self, **params: Any) -> dict[str, Any]:
+    async def list(
+        self,
+        *,
+        after: str | None = None,
+        before: str | None = None,
+        limit: int | None = None,
+        order: str | None = None,
+        **params: Any,
+    ) -> dict[str, Any]:
+        query: dict[str, Any] = dict(params)
+        if after is not None:
+            query["after"] = after
+        if before is not None:
+            query["before"] = before
+        if limit is not None:
+            query["limit"] = limit
+        if order is not None:
+            query["order"] = order
         out = await self._client._engine.avector_store_request(
             method="GET",
             path="/vector_stores",
-            payload=params,
+            payload=query,
         )
         data = out.get("data")
         if isinstance(data, list):
@@ -169,11 +293,31 @@ class AsyncVectorStores(AsyncAPIResource):
             deleted=bool(out.get("deleted", True)),
         )
 
-    async def search(self, vector_store_id: str, *, query: str, **payload: Any) -> dict[str, Any]:
+    async def search(
+        self,
+        vector_store_id: str,
+        *,
+        query: str,
+        max_num_results: int | None = None,
+        filters: dict[str, Any] | None = None,
+        ranking_options: dict[str, Any] | None = None,
+        rewrite_query: bool | None = None,
+        **payload: Any,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = dict(payload)
+        body["query"] = query
+        if max_num_results is not None:
+            body["max_num_results"] = max_num_results
+        if filters is not None:
+            body["filters"] = filters
+        if ranking_options is not None:
+            body["ranking_options"] = ranking_options
+        if rewrite_query is not None:
+            body["rewrite_query"] = rewrite_query
         return await self._client._engine.avector_store_request(
             method="POST",
             path=f"/vector_stores/{vector_store_id}/search",
-            payload={"query": query, **payload},
+            payload=body,
         )
 
     @property

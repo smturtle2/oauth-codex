@@ -50,20 +50,51 @@
 
 ```python
 # sync
-client.vector_stores.create(**payload) -> VectorStore
+client.vector_stores.create(
+    *,
+    name: str | None = None,
+    file_ids: list[str] | None = None,
+    metadata: dict[str, Any] | None = None,
+    expires_after: dict[str, Any] | None = None,
+    **payload,
+) -> VectorStore
 client.vector_stores.retrieve(vector_store_id: str) -> VectorStore
-client.vector_stores.update(vector_store_id: str, **payload) -> VectorStore
-client.vector_stores.list(**params) -> dict
+client.vector_stores.update(
+    vector_store_id: str,
+    *,
+    name: str | None = None,
+    file_ids: list[str] | None = None,
+    metadata: dict[str, Any] | None = None,
+    expires_after: dict[str, Any] | None = None,
+    **payload,
+) -> VectorStore
+client.vector_stores.list(
+    *,
+    after: str | None = None,
+    before: str | None = None,
+    limit: int | None = None,
+    order: str | None = None,
+    **params,
+) -> dict
 client.vector_stores.delete(vector_store_id: str) -> VectorStoreDeleted
-client.vector_stores.search(vector_store_id: str, *, query: str, **payload) -> dict
+client.vector_stores.search(
+    vector_store_id: str,
+    *,
+    query: str,
+    max_num_results: int | None = None,
+    filters: dict[str, Any] | None = None,
+    ranking_options: dict[str, Any] | None = None,
+    rewrite_query: bool | None = None,
+    **payload,
+) -> dict
 
 # async
-await client.vector_stores.create(**payload) -> VectorStore
+await client.vector_stores.create(...) -> VectorStore
 await client.vector_stores.retrieve(vector_store_id: str) -> VectorStore
-await client.vector_stores.update(vector_store_id: str, **payload) -> VectorStore
-await client.vector_stores.list(**params) -> dict
+await client.vector_stores.update(...) -> VectorStore
+await client.vector_stores.list(...) -> dict
 await client.vector_stores.delete(vector_store_id: str) -> VectorStoreDeleted
-await client.vector_stores.search(vector_store_id: str, *, query: str, **payload) -> dict
+await client.vector_stores.search(...) -> dict
 
 # module-level
 oauth_codex.vector_stores.create(...)
@@ -74,16 +105,37 @@ oauth_codex.vector_stores.delete(...)
 oauth_codex.vector_stores.search(...)
 ```
 
-### Parameters
+### Parameters (루트 메서드)
 
-| 메서드 | 파라미터 |
-|---|---|
-| `create` | 임의 payload 필드 전달/로컬 에뮬레이션 (`name`, `file_ids`, `metadata` 등) |
-| `retrieve` | `vector_store_id: str` |
-| `update` | `vector_store_id: str` + payload |
-| `list` | 선택 query-like params |
-| `delete` | `vector_store_id: str` |
-| `search` | `vector_store_id: str`, 필수 `query: str`, 선택 payload (`max_num_results` 등) |
+| 메서드 | 파라미터 | 타입 | 필수 | 기본값 | 동작 |
+|---|---|---|---|---|---|
+| `create` | `name` | `str | None` | 아니오 | `None` | 벡터 스토어 표시 이름 |
+| `create` | `file_ids` | `list[str] | None` | 아니오 | `None` | 초기 파일 멤버십 |
+| `create` | `metadata` | `dict[str, Any] | None` | 아니오 | `None` | 메타데이터 필드 |
+| `create` | `expires_after` | `dict[str, Any] | None` | 아니오 | `None` | 만료 정책 payload |
+| `create` | `**payload` | `dict` | 아니오 | - | 추가 호환성 필드는 그대로 전달 |
+| `retrieve` | `vector_store_id` | `str` | 예 | - | 대상 벡터 스토어 ID |
+| `update` | `vector_store_id` | `str` | 예 | - | 대상 벡터 스토어 ID |
+| `update` | `name` | `str | None` | 아니오 | `None` | 표시 이름 변경 |
+| `update` | `file_ids` | `list[str] | None` | 아니오 | `None` | 멤버십 교체 |
+| `update` | `metadata` | `dict[str, Any] | None` | 아니오 | `None` | 메타데이터 교체 |
+| `update` | `expires_after` | `dict[str, Any] | None` | 아니오 | `None` | 만료 정책 교체 |
+| `update` | `**payload` | `dict` | 아니오 | - | 추가 호환성 필드는 그대로 전달 |
+| `list` | `after` | `str | None` | 아니오 | `None` | cursor 유사 query 입력 |
+| `list` | `before` | `str | None` | 아니오 | `None` | cursor 유사 query 입력 |
+| `list` | `limit` | `int | None` | 아니오 | `None` | 최대 항목 수 |
+| `list` | `order` | `str | None` | 아니오 | `None` | 정렬 힌트 (`asc`/`desc`) |
+| `list` | `**params` | `dict` | 아니오 | - | 추가 query-like 호환성 필드 |
+| `delete` | `vector_store_id` | `str` | 예 | - | 대상 벡터 스토어 ID |
+| `search` | `vector_store_id` | `str` | 예 | - | 대상 벡터 스토어 ID |
+| `search` | `query` | `str` | 예 | - | 검색 텍스트 |
+| `search` | `max_num_results` | `int | None` | 아니오 | `None` | 결과 개수 힌트 |
+| `search` | `filters` | `dict[str, Any] | None` | 아니오 | `None` | provider filter payload |
+| `search` | `ranking_options` | `dict[str, Any] | None` | 아니오 | `None` | provider ranking payload |
+| `search` | `rewrite_query` | `bool | None` | 아니오 | `None` | provider query rewrite 힌트 |
+| `search` | `**payload` | `dict` | 아니오 | - | 추가 호환성 필드는 그대로 전달 |
+
+- 호환 규칙: 명시 파라미터와 추가 `**payload/**params`는 함께 merge되어 전송됩니다.
 
 ### Return Shapes
 

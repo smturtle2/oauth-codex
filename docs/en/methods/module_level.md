@@ -90,6 +90,7 @@ resp = client.responses.create(model="gpt-5.3-codex", input="hello")
 ## Behavior Notes
 
 - Module-level proxy uses sync client behavior.
+- `oauth_codex.responses` and `oauth_codex.vector_stores` expose typed proxy hints so IDE signature help shows named parameters.
 - Unsupported resources still exist as attributes for API surface parity.
 - If you need async behavior, use `AsyncOAuthCodexClient` directly.
 
