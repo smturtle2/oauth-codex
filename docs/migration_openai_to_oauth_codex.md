@@ -1,24 +1,24 @@
 # Migration: OpenAI SDK -> oauth-codex
 
-This guide focuses on the currently supported runtime surface.
+This guide focuses on the v2 runtime surface.
 
-## Supported mappings
+## v2 Public Surface
 
-- `responses.*` -> `responses.*`
-- `files.*` -> `files.*`
-- `vector_stores.*` -> `vector_stores.*`
-- `models.capabilities/retrieve/list` -> same names
+- `oauth_codex.Client` (single public client)
+- `Client.generate(...)`
+- `Client.stream(...)`
+- `Client.agenerate(...)`
+- `Client.astream(...)`
 
-## Removed legacy modules/types
+## Removed in v2
 
-- `oauth_codex.legacy_types` removed
-- `oauth_codex.legacy_auth` removed
-
-Use:
-
-- `oauth_codex.core_types`
+- `AsyncOAuthCodexClient`, `AsyncClient`
+- module-level proxies (`oauth_codex.responses/files/vector_stores/models`)
+- resource-style public API (`client.responses.*`, `client.files.*`, `client.vector_stores.*`, `client.models.*`)
+- `oauth_codex.compat` public module
+- advanced request options public API
 
 ## Notes
 
-- Module-level calls are supported for `responses`, `files`, `vector_stores`, `models` only.
-- Removed resources/methods now fail by missing attribute/import (`AttributeError` / `ImportError`).
+- Function calling is automatic in `generate/stream/agenerate/astream`.
+- Image input analysis is supported via `images=` (URL or local file path).

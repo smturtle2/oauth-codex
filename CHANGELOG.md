@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.0.0
+
+### Breaking
+
+- Public API was reduced to a single `Client` class with:
+  - `generate(...)`
+  - `stream(...)`
+  - `agenerate(...)`
+  - `astream(...)`
+- Removed public surfaces:
+  - `AsyncOAuthCodexClient`, `AsyncClient`
+  - module-level proxies (`oauth_codex.responses/files/vector_stores/models`)
+  - resource-style client access (`client.responses.*`, `client.files.*`, `client.vector_stores.*`, `client.models.*`)
+  - `oauth_codex.compat` module exports
+- Advanced per-request options are no longer public (`extra_headers`, `extra_query`, `extra_body`, `validation_mode`, `store_behavior`).
+
+### Added
+
+- `generate`-first UX with automatic function-calling loop.
+- Image input support in `generate/stream/agenerate/astream`:
+  - URL image inputs
+  - local file paths converted to data URLs
+- `reasoning_effort` public option with default `"medium"`.
+- Stream APIs now support automatic function-calling continuation across rounds.
+
 ## 1.1.0
 
 ### Breaking

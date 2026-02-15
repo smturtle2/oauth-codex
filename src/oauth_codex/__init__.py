@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from . import types
-from ._client import AsyncOAuthCodexClient, OAuthCodexClient
+from ._client import Client, OAuthCodexClient
 from ._exceptions import (
     APIConnectionError,
     APIError,
@@ -33,39 +33,14 @@ from ._exceptions import (
     ToolCallRequiredError,
     UnprocessableEntityError,
 )
-from ._module_client import (
-    base_url,
-    default_headers,
-    default_query,
-    files,
-    http_client,
-    max_retries,
-    models,
-    oauth_audience,
-    oauth_authorization_endpoint,
-    oauth_client_id,
-    oauth_discovery_url,
-    oauth_originator,
-    oauth_redirect_uri,
-    oauth_scope,
-    oauth_token_endpoint,
-    responses,
-    timeout,
-    vector_stores,
-)
 from ._version import __title__, __version__
-
-Client = OAuthCodexClient
-AsyncClient = AsyncOAuthCodexClient
 
 __all__ = [
     "types",
     "__title__",
     "__version__",
     "Client",
-    "AsyncClient",
     "OAuthCodexClient",
-    "AsyncOAuthCodexClient",
     "OAuthCodexError",
     "OpenAIError",
     "APIError",
@@ -95,22 +70,4 @@ __all__ = [
     "TokenStoreDeleteError",
     "ContinuityError",
     "ToolCallRequiredError",
-    "responses",
-    "files",
-    "vector_stores",
-    "models",
-    "oauth_client_id",
-    "oauth_scope",
-    "oauth_audience",
-    "oauth_redirect_uri",
-    "oauth_discovery_url",
-    "oauth_authorization_endpoint",
-    "oauth_token_endpoint",
-    "oauth_originator",
-    "base_url",
-    "timeout",
-    "max_retries",
-    "default_headers",
-    "default_query",
-    "http_client",
 ]

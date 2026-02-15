@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Literal, Protocol, TypeAlias
 
 Message: TypeAlias = dict[str, Any]
 ValidationMode: TypeAlias = Literal["warn", "error", "ignore"]
 StoreBehavior: TypeAlias = Literal["auto_disable", "error", "passthrough"]
 TruncationMode: TypeAlias = Literal["auto", "disabled"]
+ReasoningEffort: TypeAlias = Literal["low", "medium", "high"]
+ImageInput: TypeAlias = str | Path
 
 
 @dataclass

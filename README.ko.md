@@ -4,12 +4,12 @@
 
 Codex 백엔드를 위한 OAuth PKCE 기반 Python SDK입니다.
 
-## 핵심 특징
+## 핵심 변경점 (v2)
 
-- OpenAI 스타일 sync/async 클라이언트: `OAuthCodexClient`, `AsyncOAuthCodexClient`
-- 모듈 레벨 lazy proxy: `oauth_codex.responses`, `oauth_codex.files`, `oauth_codex.vector_stores`, `oauth_codex.models`
-- 구조 호환용 stub 없이, 런타임 지원 리소스만 노출
-- `pydantic` 기반 타입 + 구조화된 SDK 에러
+- 공개 클라이언트는 `Client` 하나만 제공합니다.
+- 기본 사용 흐름은 `generate` 중심입니다.
+- async는 동일 클래스의 `agenerate`, `astream` 메서드로 제공합니다.
+- 텍스트 생성, 이미지 입력 분석, function calling 자동 실행, `reasoning_effort`를 지원합니다.
 
 ## 설치
 
@@ -17,35 +17,61 @@ Codex 백엔드를 위한 OAuth PKCE 기반 Python SDK입니다.
 pip install oauth-codex
 ```
 
-## 지원 리소스
-
-- `responses` (`create`, `stream`, `input_tokens.count`)
-- `files`
-- `vector_stores` (`files`, `file_batches` 포함)
-- `models` (`capabilities`, `retrieve`, `list`)
-
 ## 빠른 시작
 
 ```python
-from oauth_codex import OAuthCodexClient
+from oauth_codex import Client
 
-client = OAuthCodexClient()
-resp = client.responses.create(model="gpt-5.3-codex", input="hello")
-print(resp.output_text)
+client = Client()
+text = client.generate("hello")
+print(text)
 ```
 
-## Core 타입
-
-`legacy_types`는 제거되었습니다.
-아래 경로를 사용하세요.
-
-- `oauth_codex.core_types`
-
-예시:
+## 이미지 입력
 
 ```python
-from oauth_codex.core_types import OAuthTokens
+text = client.generate(
+    "이 이미지를 설명해줘",
+    images=["https://example.com/cat.png", "./local-photo.jpg"],
+)
+print(text)
 ```
+
+## Function Calling (자동 루프)
+
+```python
+def add(a: int, b: int) -> dict:
+    return {"sum": a + b}
+
+text = client.generate(
+    "2+3 계산해줘",
+    tools=[add],
+)
+print(text)
+```
+
+툴 실행 중 예외가 발생하면 SDK는 `{\"error\": ...}` 형태로 모델에 전달하고 루프를 계속 진행합니다.
+
+## Async
+
+```python
+import asyncio
+from oauth_codex import Client
+
+
+async def main() -> None:
+    client = Client()
+    text = await client.agenerate("hello async")
+    print(text)
+
+
+asyncio.run(main())
+```
+
+## 버전 2.0 브레이킹 변경
+
+- 제거됨: `AsyncOAuthCodexClient`, module-level proxies, `client.responses/files/vector_stores/models`, `oauth_codex.compat`
+- 단일 진입점: `Client.generate/stream/agenerate/astream`
 
 ## 문서
 
