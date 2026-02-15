@@ -2,22 +2,22 @@
 
 # oauth-codex
 
-OAuth PKCE 기반 Codex Python SDK입니다.
+OAuth PKCE-based Python SDK for the Codex backend.
 
-## 핵심 변경점 (v2)
+## Key Changes (v2)
 
-- 공개 클라이언트는 `Client` 하나만 제공합니다.
-- 기본 사용 흐름은 `generate` 중심입니다.
-- async는 동일 클래스의 `agenerate`, `astream` 메서드로 제공합니다.
-- 텍스트 생성, 이미지 입력 분석, function calling 자동 실행, `reasoning_effort`를 지원합니다.
+- The public API now exposes a single `Client`.
+- The default workflow is centered around `generate`.
+- Async support is provided on the same class via `agenerate` and `astream`.
+- Supports text generation, image input analysis, automatic function-calling execution, and `reasoning_effort`.
 
-## 설치
+## Installation
 
 ```bash
 pip install oauth-codex
 ```
 
-## 빠른 시작
+## Quick Start
 
 ```python
 from oauth_codex import Client
@@ -27,30 +27,30 @@ text = client.generate("hello")
 print(text)
 ```
 
-## 이미지 입력
+## Image Input
 
 ```python
 text = client.generate(
-    "이 이미지를 설명해줘",
+    "Describe this image",
     images=["https://example.com/cat.png", "./local-photo.jpg"],
 )
 print(text)
 ```
 
-## Function Calling (자동 루프)
+## Function Calling (Automatic Loop)
 
 ```python
 def add(a: int, b: int) -> dict:
     return {"sum": a + b}
 
 text = client.generate(
-    "2+3 계산해줘",
+    "Calculate 2+3",
     tools=[add],
 )
 print(text)
 ```
 
-툴 실행 중 예외가 발생하면 SDK는 `{\"error\": ...}` 형태로 모델에 전달하고 루프를 계속 진행합니다.
+If a tool raises an exception, the SDK forwards it to the model as `{\"error\": ...}` and continues the loop.
 
 ## Async
 
@@ -68,22 +68,22 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-## 버전 2.0 브레이킹 변경
+## Breaking Changes in v2.0
 
-- 제거됨: `AsyncOAuthCodexClient`, module-level proxies, `client.responses/files/vector_stores/models`, `oauth_codex.compat`
-- 단일 진입점: `Client.generate/stream/agenerate/astream`
+- Removed: `AsyncOAuthCodexClient`, module-level proxies, `client.responses/files/vector_stores/models`, `oauth_codex.compat`
+- Single entry points: `Client.generate/stream/agenerate/astream`
 
-## 문서
+## Documentation
 
-- 영문 인덱스: [`docs/en/index.md`](docs/en/index.md)
-- 국문 인덱스: [`docs/ko/index.md`](docs/ko/index.md)
+- English index: [`docs/en/index.md`](docs/en/index.md)
+- Korean index: [`docs/ko/index.md`](docs/ko/index.md)
 
-## 개발
+## Development
 
 ```bash
 pytest -q
 ```
 
-## 변경 이력
+## Changelog
 
 - [`CHANGELOG.md`](CHANGELOG.md)
