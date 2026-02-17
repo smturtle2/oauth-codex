@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oauth-codex"
-version = "2.2.0"
+version = "2.3.0"
 description = "Codex OAuth-based Python SDK with a single Client and generate-first API"
 readme = "README.md"
 requires-python = ">=3.11"
