@@ -3,11 +3,13 @@ from __future__ import annotations
 import pytest
 
 import oauth_codex
+from oauth_codex.core_types import listMessage
 
 
 def test_single_client_public_surface() -> None:
     assert oauth_codex.Client is oauth_codex.OAuthCodexClient
     assert oauth_codex.Client is not None
+    assert oauth_codex.listMessage is listMessage
 
 
 def test_removed_async_and_module_level_exports() -> None:

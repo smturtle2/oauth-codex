@@ -2,10 +2,19 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+# Prefer local source tree when running examples from the repository.
+_SRC_PATH = Path(__file__).resolve().parents[1] / "src"
+_SRC_PATH_STR = str(_SRC_PATH)
+if _SRC_PATH_STR in sys.path:
+    sys.path.remove(_SRC_PATH_STR)
+sys.path.insert(0, _SRC_PATH_STR)
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Codex OAuth login + responses smoke test")
+    parser = argparse.ArgumentParser(description="Codex OAuth login + generate smoke test")
     parser.add_argument(
         "--model",
         default="gpt-5.3-codex",
@@ -48,15 +57,19 @@ def main() -> int:
     try:
         if args.stream:
             print("----- stream begin -----")
-            events = client.responses.create(model=args.model, input=args.prompt, stream=True)
-            for event in events:
-                if event.type == "text_delta" and event.delta:
-                    print(event.delta, end="", flush=True)
+            for delta in client.stream(
+                [{"role": "user", "content": args.prompt}],
+                model=args.model,
+            ):
+                print(delta, end="", flush=True)
             print("\n----- stream end -----")
         else:
-            response = client.responses.create(model=args.model, input=args.prompt)
+            response = client.generate(
+                [{"role": "user", "content": args.prompt}],
+                model=args.model,
+            )
             print("----- response -----")
-            print(response.output_text)
+            print(response)
             print("--------------------")
     except AuthRequiredError as exc:
         print("Authentication flow requires user action.")

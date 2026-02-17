@@ -39,21 +39,45 @@ def test_generate_uses_default_model_and_reasoning_effort(monkeypatch: pytest.Mo
 
     monkeypatch.setattr(client._engine, "generate", fake_generate)
 
-    out = client.generate("hello")
+    out = client.generate([{"role": "user", "content": "hello"}])
 
     assert out == "ok"
     assert captured["model"] == "gpt-5.3-codex"
     assert captured["reasoning"] == {"effort": "medium"}
 
 
-def test_generate_accepts_url_and_local_image_inputs(
-    monkeypatch: pytest.MonkeyPatch, tmp_path
+def test_generate_rejects_non_list_messages() -> None:
+    client = _client()
+
+    with pytest.raises(TypeError, match="non-empty list"):
+        client.generate("hello")  # type: ignore[arg-type]
+
+
+def test_generate_rejects_empty_messages() -> None:
+    client = _client()
+
+    with pytest.raises(ValueError, match="non-empty list"):
+        client.generate([])
+
+
+def test_generate_rejects_removed_prompt_and_images_kwargs() -> None:
+    client = _client()
+
+    with pytest.raises(TypeError, match="prompt"):
+        client.generate(prompt="hello")  # type: ignore[call-arg]
+
+    with pytest.raises(TypeError, match="images"):
+        client.generate(  # type: ignore[call-arg]
+            [{"role": "user", "content": "hello"}],
+            images=["https://example.com/cat.png"],
+        )
+
+
+def test_generate_preserves_mixed_content_message_order(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client = _client()
     captured: dict[str, object] = {}
-
-    image_path = tmp_path / "photo.png"
-    image_path.write_bytes(b"PNGDATA")
 
     def fake_generate(**kwargs):
         captured.update(kwargs)
@@ -61,10 +85,18 @@ def test_generate_accepts_url_and_local_image_inputs(
 
     monkeypatch.setattr(client._engine, "generate", fake_generate)
 
-    out = client.generate(
-        "describe",
-        images=["https://example.com/cat.png", image_path],
-    )
+    mixed_messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": "describe"},
+                {"type": "input_image", "image_url": "https://example.com/cat.png"},
+                {"type": "input_text", "text": "focus on the cat"},
+                {"type": "input_image", "image_url": "data:image/png;base64,AAAA"},
+            ],
+        }
+    ]
+    out = client.generate(messages=mixed_messages)
 
     assert out == "ok"
     messages = captured["messages"]
@@ -72,8 +104,9 @@ def test_generate_accepts_url_and_local_image_inputs(
     content = messages[0]["content"]
     assert content[0]["type"] == "input_text"
     assert content[1] == {"type": "input_image", "image_url": "https://example.com/cat.png"}
-    assert content[2]["type"] == "input_image"
-    assert content[2]["image_url"].startswith("data:image/png;base64,")
+    assert content[2] == {"type": "input_text", "text": "focus on the cat"}
+    assert content[3] == {"type": "input_image", "image_url": "data:image/png;base64,AAAA"}
+    assert messages == mixed_messages
 
 
 def test_generate_auto_function_calling(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -96,7 +129,7 @@ def test_generate_auto_function_calling(monkeypatch: pytest.MonkeyPatch) -> None
     def add(a: int, b: int) -> dict[str, int]:
         return {"sum": a + b}
 
-    out = client.generate("2+3", tools=[add])
+    out = client.generate([{"role": "user", "content": "2+3"}], tools=[add])
 
     assert out == "5"
     assert calls[1]["previous_response_id"] == "resp_1"
@@ -129,7 +162,7 @@ def test_generate_replays_messages_when_tool_round_has_no_response_id(
     def add(a: int, b: int) -> dict[str, int]:
         return {"sum": a + b}
 
-    out = client.generate("1+2", tools=[add])
+    out = client.generate([{"role": "user", "content": "1+2"}], tools=[add])
 
     assert out == "3"
     assert calls[1]["previous_response_id"] is None
@@ -157,7 +190,7 @@ def test_generate_tool_failure_is_forwarded_to_model(monkeypatch: pytest.MonkeyP
         _ = x
         raise ValueError("boom")
 
-    out = client.generate("run", tools=[bad_tool])
+    out = client.generate([{"role": "user", "content": "run"}], tools=[bad_tool])
 
     assert out == "handled"
     tool_results = calls[1]["tool_results"]
@@ -184,7 +217,7 @@ def test_generate_wraps_string_tool_output_as_dict(monkeypatch: pytest.MonkeyPat
     def echo(query: str) -> str:
         return query
 
-    out = client.generate("run once", tools=[echo])
+    out = client.generate([{"role": "user", "content": "run once"}], tools=[echo])
 
     assert out == "done"
     tool_results = calls[1]["tool_results"]
@@ -213,7 +246,7 @@ def test_generate_supports_single_pydantic_tool_input_with_flat_payload(
     def tool(input: ToolInputWithDescription) -> str:
         return f"Tool received query: {input.query}"
 
-    out = client.generate("run", tools=[tool])
+    out = client.generate([{"role": "user", "content": "run"}], tools=[tool])
 
     assert out == "done"
     first_round_tools = calls[0]["tools"]
@@ -253,7 +286,7 @@ def test_generate_supports_single_pydantic_tool_input_with_nested_payload(
     def tool(input: ToolInput) -> str:
         return f"Tool received query: {input.query}"
 
-    out = client.generate("run", tools=[tool])
+    out = client.generate([{"role": "user", "content": "run"}], tools=[tool])
 
     assert out == "done"
     tool_results = calls[1]["tool_results"]
@@ -279,7 +312,7 @@ def test_generate_raises_when_tool_round_limit_exceeded(monkeypatch: pytest.Monk
         return {"ok": True}
 
     with pytest.raises(RuntimeError, match="exceeded"):
-        client.generate("loop", tools=[loop])
+        client.generate([{"role": "user", "content": "loop"}], tools=[loop])
 
 
 def test_generate_supports_structured_output_with_pydantic_schema(
@@ -299,7 +332,10 @@ def test_generate_supports_structured_output_with_pydantic_schema(
 
     monkeypatch.setattr(client._engine, "generate", fake_generate)
 
-    out = client.generate("return json", output_schema=StructuredOutput)
+    out = client.generate(
+        [{"role": "user", "content": "return json"}],
+        output_schema=StructuredOutput,
+    )
 
     assert out == {"answer": "ok", "count": 1}
     response_format = captured["response_format"]
@@ -329,7 +365,7 @@ def test_generate_supports_structured_output_with_raw_schema_dict(
     monkeypatch.setattr(client._engine, "generate", fake_generate)
 
     out = client.generate(
-        "return json",
+        [{"role": "user", "content": "return json"}],
         output_schema={
             "type": "object",
             "properties": {"ok": {"type": "boolean"}},
@@ -360,7 +396,7 @@ def test_generate_structured_output_rejects_invalid_json(monkeypatch: pytest.Mon
 
     with pytest.raises(ValueError, match="valid JSON"):
         client.generate(
-            "return json",
+            [{"role": "user", "content": "return json"}],
             output_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
         )
 
@@ -381,7 +417,10 @@ def test_generate_structured_output_enforces_pydantic_strict_validation(
     monkeypatch.setattr(client._engine, "generate", fake_generate)
 
     with pytest.raises(ValidationError):
-        client.generate("return json", output_schema=StructuredOutput)
+        client.generate(
+            [{"role": "user", "content": "return json"}],
+            output_schema=StructuredOutput,
+        )
 
 
 def test_stream_supports_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -408,7 +447,7 @@ def test_stream_supports_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
     def add(a: int, b: int) -> dict[str, int]:
         return {"sum": a + b}
 
-    out = list(client.stream("calc", tools=[add]))
+    out = list(client.stream([{"role": "user", "content": "calc"}], tools=[add]))
 
     assert out == ["A", "B"]
     assert calls[1]["previous_response_id"] == "resp_1"
@@ -433,7 +472,7 @@ def test_stream_accepts_output_schema_and_keeps_text_stream(
 
     out = list(
         client.stream(
-            "return json",
+            messages=[{"role": "user", "content": "return json"}],
             output_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
         )
     )

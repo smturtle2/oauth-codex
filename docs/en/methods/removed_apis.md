@@ -18,7 +18,7 @@ From v2, the public surface is reduced to a single `Client` class.
 - text streaming: `client.stream(...)`
 - async generation: `await client.agenerate(...)`
 - async streaming: `async for d in client.astream(...): ...`
-- image input analysis: `images=` (URL/local file path)
+- image input analysis: `messages=[{"role":"user","content":[{"type":"input_image",...}]}]`
 - function calling: `tools=[callable, ...]` (automatic)
 
 ## See also

@@ -21,4 +21,4 @@ This guide focuses on the v2 runtime surface.
 ## Notes
 
 - Function calling is automatic in `generate/stream/agenerate/astream`.
-- Image input analysis is supported via `images=` (URL or local file path).
+- Image input analysis is supported via `messages` with `input_image` content items.

@@ -23,7 +23,7 @@ pip install oauth-codex
 from oauth_codex import Client
 
 client = Client()
-text = client.generate("hello")
+text = client.generate([{"role": "user", "content": "hello"}])
 print(text)
 ```
 
@@ -31,8 +31,16 @@ print(text)
 
 ```python
 text = client.generate(
-    "이 이미지를 설명해줘",
-    images=["https://example.com/cat.png", "./local-photo.jpg"],
+    [
+        {
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": "이 이미지를 설명해줘"},
+                {"type": "input_image", "image_url": "https://example.com/cat.png"},
+                {"type": "input_image", "image_url": "data:image/jpeg;base64,..."},
+            ],
+        }
+    ],
 )
 print(text)
 ```
@@ -44,7 +52,7 @@ def add(a: int, b: int) -> dict:
     return {"sum": a + b}
 
 text = client.generate(
-    "2+3 계산해줘",
+    [{"role": "user", "content": "2+3 계산해줘"}],
     tools=[add],
 )
 print(text)
@@ -64,7 +72,7 @@ def tool(input: ToolInput) -> str:
     return f"Tool received query: {input.query}"
 
 
-text = client.generate("툴을 사용해줘", tools=[tool])
+text = client.generate([{"role": "user", "content": "툴을 사용해줘"}], tools=[tool])
 print(text)
 ```
 
@@ -86,7 +94,7 @@ class Summary(BaseModel):
 
 client = Client()
 out = client.generate(
-    "title, score 키를 가진 JSON을 반환해줘",
+    [{"role": "user", "content": "title, score 키를 가진 JSON을 반환해줘"}],
     output_schema=Summary,
 )
 print(out)  # {"title": "...", "score": 1}
@@ -96,7 +104,7 @@ raw JSON schema 객체를 직접 전달할 수도 있습니다.
 
 ```python
 out = client.generate(
-    "{\"ok\": true} 형태 JSON을 반환해줘",
+    [{"role": "user", "content": "{\"ok\": true} 형태 JSON을 반환해줘"}],
     output_schema={
         "type": "object",
         "properties": {"ok": {"type": "boolean"}},
@@ -117,7 +125,7 @@ from oauth_codex import Client
 
 async def main() -> None:
     client = Client()
-    text = await client.agenerate("hello async")
+    text = await client.agenerate([{"role": "user", "content": "hello async"}])
     print(text)
 
 

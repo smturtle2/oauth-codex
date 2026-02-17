@@ -18,7 +18,7 @@ v2부터 공개 API는 `Client` 단일 클래스만 제공합니다.
 - 텍스트 스트림: `client.stream(...)`
 - async 생성: `await client.agenerate(...)`
 - async 스트림: `async for d in client.astream(...): ...`
-- 이미지 입력 분석: `images=` (URL/로컬 경로)
+- 이미지 입력 분석: `messages=[{"role":"user","content":[{"type":"input_image",...}]}]`
 - function calling: `tools=[callable, ...]` (자동 실행)
 
 ## 참고

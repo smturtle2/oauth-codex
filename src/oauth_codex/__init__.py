@@ -34,6 +34,7 @@ from ._exceptions import (
     UnprocessableEntityError,
 )
 from ._version import __title__, __version__
+from .core_types import listMessage
 
 __all__ = [
     "types",
@@ -41,6 +42,7 @@ __all__ = [
     "__version__",
     "Client",
     "OAuthCodexClient",
+    "listMessage",
     "OAuthCodexError",
     "OpenAIError",
     "APIError",

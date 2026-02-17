@@ -26,6 +26,51 @@ def _client() -> Client:
 
 
 @pytest.mark.asyncio
+async def test_agenerate_rejects_non_list_messages() -> None:
+    client = _client()
+
+    with pytest.raises(TypeError, match="non-empty list"):
+        await client.agenerate("hello")  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_agenerate_rejects_empty_messages() -> None:
+    client = _client()
+
+    with pytest.raises(ValueError, match="non-empty list"):
+        await client.agenerate([])
+
+
+@pytest.mark.asyncio
+async def test_agenerate_preserves_mixed_content_message_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client()
+    captured: dict[str, object] = {}
+
+    async def fake_agenerate(**kwargs):
+        captured.update(kwargs)
+        return GenerateResult(text="ok", tool_calls=[], finish_reason="stop")
+
+    monkeypatch.setattr(client._engine, "agenerate", fake_agenerate)
+
+    mixed_messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": "describe"},
+                {"type": "input_image", "image_url": "https://example.com/cat.png"},
+                {"type": "input_text", "text": "focus on the cat"},
+            ],
+        }
+    ]
+    out = await client.agenerate(messages=mixed_messages)
+
+    assert out == "ok"
+    assert captured["messages"] == mixed_messages
+
+
+@pytest.mark.asyncio
 async def test_agenerate_auto_function_calling(monkeypatch: pytest.MonkeyPatch) -> None:
     client = _client()
     calls: list[dict[str, object]] = []
@@ -46,7 +91,7 @@ async def test_agenerate_auto_function_calling(monkeypatch: pytest.MonkeyPatch) 
     async def add_async(a: int, b: int) -> dict[str, int]:
         return {"sum": a + b}
 
-    out = await client.agenerate("5+7", tools=[add_async])
+    out = await client.agenerate([{"role": "user", "content": "5+7"}], tools=[add_async])
 
     assert out == "12"
     assert calls[1]["previous_response_id"] == "resp_1"
@@ -86,7 +131,7 @@ async def test_astream_supports_tool_calls(monkeypatch: pytest.MonkeyPatch) -> N
         return {"product": a * b}
 
     out: list[str] = []
-    async for delta in client.astream("calc", tools=[mul]):
+    async for delta in client.astream([{"role": "user", "content": "calc"}], tools=[mul]):
         out.append(delta)
 
     assert out == ["X", "Y"]
@@ -117,7 +162,7 @@ async def test_agenerate_supports_single_pydantic_tool_input(monkeypatch: pytest
     def tool(input: ToolInput) -> str:
         return f"Tool received query: {input.query}"
 
-    out = await client.agenerate("run", tools=[tool])
+    out = await client.agenerate([{"role": "user", "content": "run"}], tools=[tool])
 
     assert out == "done"
     tool_results = calls[1]["tool_results"]
@@ -142,7 +187,10 @@ async def test_agenerate_supports_structured_output_with_pydantic_schema(
 
     monkeypatch.setattr(client._engine, "agenerate", fake_agenerate)
 
-    out = await client.agenerate("return json", output_schema=StructuredOutput)
+    out = await client.agenerate(
+        [{"role": "user", "content": "return json"}],
+        output_schema=StructuredOutput,
+    )
 
     assert out == {"answer": "ok", "count": 1}
     response_format = captured["response_format"]
@@ -171,7 +219,7 @@ async def test_agenerate_structured_output_rejects_invalid_json(
 
     with pytest.raises(ValueError, match="valid JSON"):
         await client.agenerate(
-            "return json",
+            [{"role": "user", "content": "return json"}],
             output_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
         )
 
@@ -193,7 +241,10 @@ async def test_agenerate_structured_output_enforces_pydantic_strict_validation(
     monkeypatch.setattr(client._engine, "agenerate", fake_agenerate)
 
     with pytest.raises(ValidationError):
-        await client.agenerate("return json", output_schema=StructuredOutput)
+        await client.agenerate(
+            [{"role": "user", "content": "return json"}],
+            output_schema=StructuredOutput,
+        )
 
 
 @pytest.mark.asyncio
@@ -217,7 +268,7 @@ async def test_astream_accepts_output_schema_and_keeps_text_stream(
 
     out: list[str] = []
     async for delta in client.astream(
-        "return json",
+        messages=[{"role": "user", "content": "return json"}],
         output_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
     ):
         out.append(delta)

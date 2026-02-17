@@ -23,7 +23,7 @@ pip install oauth-codex
 from oauth_codex import Client
 
 client = Client()
-text = client.generate("hello")
+text = client.generate([{"role": "user", "content": "hello"}])
 print(text)
 ```
 
@@ -31,8 +31,16 @@ print(text)
 
 ```python
 text = client.generate(
-    "Describe this image",
-    images=["https://example.com/cat.png", "./local-photo.jpg"],
+    [
+        {
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": "Describe this image"},
+                {"type": "input_image", "image_url": "https://example.com/cat.png"},
+                {"type": "input_image", "image_url": "data:image/jpeg;base64,..."},
+            ],
+        }
+    ],
 )
 print(text)
 ```
@@ -44,7 +52,7 @@ def add(a: int, b: int) -> dict:
     return {"sum": a + b}
 
 text = client.generate(
-    "Calculate 2+3",
+    [{"role": "user", "content": "Calculate 2+3"}],
     tools=[add],
 )
 print(text)
@@ -64,7 +72,7 @@ def tool(input: ToolInput) -> str:
     return f"Tool received query: {input.query}"
 
 
-text = client.generate("Use the tool", tools=[tool])
+text = client.generate([{"role": "user", "content": "Use the tool"}], tools=[tool])
 print(text)
 ```
 
@@ -86,7 +94,7 @@ class Summary(BaseModel):
 
 client = Client()
 out = client.generate(
-    "Return JSON with title and score",
+    [{"role": "user", "content": "Return JSON with title and score"}],
     output_schema=Summary,
 )
 print(out)  # {"title": "...", "score": 1}
@@ -96,7 +104,7 @@ You can also pass a raw JSON schema object.
 
 ```python
 out = client.generate(
-    "Return {\"ok\": true}",
+    [{"role": "user", "content": "Return {\"ok\": true}"}],
     output_schema={
         "type": "object",
         "properties": {"ok": {"type": "boolean"}},
@@ -117,7 +125,7 @@ from oauth_codex import Client
 
 async def main() -> None:
     client = Client()
-    text = await client.agenerate("hello async")
+    text = await client.agenerate([{"role": "user", "content": "hello async"}])
     print(text)
 
 

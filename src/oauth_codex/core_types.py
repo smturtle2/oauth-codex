@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Protocol, TypeAlias
 
 Message: TypeAlias = dict[str, Any]
+listMessage: TypeAlias = list[Message]
 ValidationMode: TypeAlias = Literal["warn", "error", "ignore"]
 StoreBehavior: TypeAlias = Literal["auto_disable", "error", "passthrough"]
 TruncationMode: TypeAlias = Literal["auto", "disabled"]

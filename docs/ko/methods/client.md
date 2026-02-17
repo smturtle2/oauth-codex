@@ -21,8 +21,7 @@ client = Client()
 
 ## 공통 주요 옵션
 
-- `prompt`: 텍스트 프롬프트
-- `images`: 이미지 입력(URL 문자열 또는 로컬 파일 경로)
+- `messages`: 비어 있지 않은 response input 메시지 리스트
 - `tools`: Python callable 리스트 (function calling 자동 실행)
 - `model`: 생략 시 기본 `gpt-5.3-codex`
 - `reasoning_effort`: `low | medium | high` (기본 `medium`)
@@ -33,7 +32,7 @@ client = Client()
 ## 텍스트 생성
 
 ```python
-text = client.generate("hello")
+text = client.generate([{"role": "user", "content": "hello"}])
 print(text)
 ```
 
@@ -41,13 +40,21 @@ print(text)
 
 ```python
 text = client.generate(
-    "이 이미지를 설명해줘",
-    images=["https://example.com/photo.png", "./photo.jpg"],
+    [
+        {
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": "이 이미지를 설명해줘"},
+                {"type": "input_image", "image_url": "https://example.com/photo.png"},
+                {"type": "input_image", "image_url": "data:image/jpeg;base64,..."},
+            ],
+        }
+    ],
 )
 print(text)
 ```
 
-로컬 파일 경로는 내부적으로 data URL로 변환됩니다.
+`input_image` 항목에 URL 또는 data URL을 전달하면 됩니다.
 
 ## Function Calling (자동)
 
@@ -55,7 +62,7 @@ print(text)
 def get_weather(city: str) -> dict:
     return {"city": city, "weather": "sunny"}
 
-text = client.generate("서울 날씨 알려줘", tools=[get_weather])
+text = client.generate([{"role": "user", "content": "서울 날씨 알려줘"}], tools=[get_weather])
 ```
 
 단일 파라미터 Pydantic 입력 툴도 지원합니다.
@@ -72,7 +79,7 @@ def tool(input: ToolInput) -> str:
     return f"Tool received query: {input.query}"
 
 
-text = client.generate("툴을 사용해줘", tools=[tool])
+text = client.generate([{"role": "user", "content": "툴을 사용해줘"}], tools=[tool])
 ```
 
 툴 실행 예외는 `{ "error": "..." }` 형태로 모델에 전달되어 루프가 이어집니다.
@@ -88,7 +95,7 @@ class Summary(BaseModel):
     score: int
 
 
-out = client.generate("JSON을 반환해줘", output_schema=Summary)
+out = client.generate([{"role": "user", "content": "JSON을 반환해줘"}], output_schema=Summary)
 print(out)  # {"title": "...", "score": 1}
 ```
 
@@ -96,7 +103,7 @@ raw JSON schema dict도 지원합니다.
 
 ```python
 out = client.generate(
-    "JSON을 반환해줘",
+    [{"role": "user", "content": "JSON을 반환해줘"}],
     output_schema={
         "type": "object",
         "properties": {"ok": {"type": "boolean"}},
@@ -109,16 +116,16 @@ out = client.generate(
 ## 스트리밍
 
 ```python
-for delta in client.stream("hello"):
+for delta in client.stream([{"role": "user", "content": "hello"}]):
     print(delta, end="")
 ```
 
 ## Async
 
 ```python
-text = await client.agenerate("hello")
+text = await client.agenerate([{"role": "user", "content": "hello"}])
 
-async for delta in client.astream("hello"):
+async for delta in client.astream([{"role": "user", "content": "hello"}]):
     print(delta, end="")
 ```
 

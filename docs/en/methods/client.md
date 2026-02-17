@@ -21,8 +21,7 @@ client = Client()
 
 ## Common Options
 
-- `prompt`: text prompt
-- `images`: image input (URL string or local file path)
+- `messages`: non-empty list of response input messages
 - `tools`: list of Python callables (automatic function-calling loop)
 - `model`: defaults to `gpt-5.3-codex`
 - `reasoning_effort`: `low | medium | high` (default `medium`)
@@ -33,7 +32,7 @@ client = Client()
 ## Text Generation
 
 ```python
-text = client.generate("hello")
+text = client.generate([{"role": "user", "content": "hello"}])
 print(text)
 ```
 
@@ -41,13 +40,21 @@ print(text)
 
 ```python
 text = client.generate(
-    "Describe this image",
-    images=["https://example.com/photo.png", "./photo.jpg"],
+    [
+        {
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": "Describe this image"},
+                {"type": "input_image", "image_url": "https://example.com/photo.png"},
+                {"type": "input_image", "image_url": "data:image/jpeg;base64,..."},
+            ],
+        }
+    ],
 )
 print(text)
 ```
 
-Local file paths are converted to data URLs internally.
+Use a `input_image` item with a URL or data URL.
 
 ## Function Calling (Automatic)
 
@@ -55,7 +62,7 @@ Local file paths are converted to data URLs internally.
 def get_weather(city: str) -> dict:
     return {"city": city, "weather": "sunny"}
 
-text = client.generate("What's weather in Seoul?", tools=[get_weather])
+text = client.generate([{"role": "user", "content": "What's weather in Seoul?"}], tools=[get_weather])
 ```
 
 Single-parameter Pydantic tool inputs are also supported.
@@ -72,7 +79,7 @@ def tool(input: ToolInput) -> str:
     return f"Tool received query: {input.query}"
 
 
-text = client.generate("Use the tool", tools=[tool])
+text = client.generate([{"role": "user", "content": "Use the tool"}], tools=[tool])
 ```
 
 Tool exceptions are forwarded to the model as `{ "error": "..." }` and the loop continues.
@@ -88,7 +95,7 @@ class Summary(BaseModel):
     score: int
 
 
-out = client.generate("Return JSON", output_schema=Summary)
+out = client.generate([{"role": "user", "content": "Return JSON"}], output_schema=Summary)
 print(out)  # {"title": "...", "score": 1}
 ```
 
@@ -96,7 +103,7 @@ Raw JSON schema dict is also supported:
 
 ```python
 out = client.generate(
-    "Return JSON",
+    [{"role": "user", "content": "Return JSON"}],
     output_schema={
         "type": "object",
         "properties": {"ok": {"type": "boolean"}},
@@ -109,16 +116,16 @@ out = client.generate(
 ## Streaming
 
 ```python
-for delta in client.stream("hello"):
+for delta in client.stream([{"role": "user", "content": "hello"}]):
     print(delta, end="")
 ```
 
 ## Async
 
 ```python
-text = await client.agenerate("hello")
+text = await client.agenerate([{"role": "user", "content": "hello"}])
 
-async for delta in client.astream("hello"):
+async for delta in client.astream([{"role": "user", "content": "hello"}]):
     print(delta, end="")
 ```
 

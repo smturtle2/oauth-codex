@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import base64
 import asyncio
 import inspect
 import json
-import mimetypes
-from pathlib import Path
 from typing import Any, AsyncIterator, Callable, Iterator, get_type_hints
 
 from pydantic import BaseModel
@@ -15,11 +12,10 @@ from ._engine import OAuthCodexClient as _EngineClient
 from .auth.config import OAuthConfig
 from .core_types import (
     GenerateResult,
-    ImageInput,
-    Message,
     ReasoningEffort,
     ToolCall,
     ToolResult,
+    listMessage,
 )
 from .store import FallbackTokenStore
 from .tooling import build_strict_response_format, callable_to_tool_schema, normalize_tool_output
@@ -88,9 +84,8 @@ class OAuthCodexClient(SyncAPIClient):
 
     def generate(
         self,
-        prompt: str | None = None,
+        messages: listMessage | None = None,
         *,
-        images: ImageInput | list[ImageInput] | None = None,
         tools: list[Callable[..., Any]] | None = None,
         model: str | None = None,
         reasoning_effort: ReasoningEffort = "medium",
@@ -100,7 +95,7 @@ class OAuthCodexClient(SyncAPIClient):
         output_schema: StructuredOutputSchema | None = None,
         strict_output: bool | None = None,
     ) -> str | dict[str, Any]:
-        messages = self._build_messages(prompt=prompt, images=images)
+        messages = self._normalize_initial_messages(messages)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
         response_format, effective_strict_output = self._resolve_structured_output_options(
             output_schema=output_schema,
@@ -149,9 +144,8 @@ class OAuthCodexClient(SyncAPIClient):
 
     async def agenerate(
         self,
-        prompt: str | None = None,
+        messages: listMessage | None = None,
         *,
-        images: ImageInput | list[ImageInput] | None = None,
         tools: list[Callable[..., Any]] | None = None,
         model: str | None = None,
         reasoning_effort: ReasoningEffort = "medium",
@@ -161,7 +155,7 @@ class OAuthCodexClient(SyncAPIClient):
         output_schema: StructuredOutputSchema | None = None,
         strict_output: bool | None = None,
     ) -> str | dict[str, Any]:
-        messages = self._build_messages(prompt=prompt, images=images)
+        messages = self._normalize_initial_messages(messages)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
         response_format, effective_strict_output = self._resolve_structured_output_options(
             output_schema=output_schema,
@@ -210,9 +204,8 @@ class OAuthCodexClient(SyncAPIClient):
 
     def stream(
         self,
-        prompt: str | None = None,
+        messages: listMessage | None = None,
         *,
-        images: ImageInput | list[ImageInput] | None = None,
         tools: list[Callable[..., Any]] | None = None,
         model: str | None = None,
         reasoning_effort: ReasoningEffort = "medium",
@@ -222,7 +215,7 @@ class OAuthCodexClient(SyncAPIClient):
         output_schema: StructuredOutputSchema | None = None,
         strict_output: bool | None = None,
     ) -> Iterator[str]:
-        messages = self._build_messages(prompt=prompt, images=images)
+        messages = self._normalize_initial_messages(messages)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
         response_format, effective_strict_output = self._resolve_structured_output_options(
             output_schema=output_schema,
@@ -271,9 +264,8 @@ class OAuthCodexClient(SyncAPIClient):
 
     async def astream(
         self,
-        prompt: str | None = None,
+        messages: listMessage | None = None,
         *,
-        images: ImageInput | list[ImageInput] | None = None,
         tools: list[Callable[..., Any]] | None = None,
         model: str | None = None,
         reasoning_effort: ReasoningEffort = "medium",
@@ -283,7 +275,7 @@ class OAuthCodexClient(SyncAPIClient):
         output_schema: StructuredOutputSchema | None = None,
         strict_output: bool | None = None,
     ) -> AsyncIterator[str]:
-        messages = self._build_messages(prompt=prompt, images=images)
+        messages = self._normalize_initial_messages(messages)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
         response_format, effective_strict_output = self._resolve_structured_output_options(
             output_schema=output_schema,
@@ -375,10 +367,10 @@ class OAuthCodexClient(SyncAPIClient):
     def _messages_for_round(
         self,
         *,
-        messages: list[Message],
+        messages: listMessage,
         previous_response_id: str | None,
         tool_results: list[ToolResult] | None,
-    ) -> list[Message]:
+    ) -> listMessage:
         if self._is_tool_continuation_round(
             previous_response_id=previous_response_id,
             tool_results=tool_results,
@@ -386,64 +378,14 @@ class OAuthCodexClient(SyncAPIClient):
             return []
         return messages
 
-    def _build_messages(
-        self,
-        *,
-        prompt: str | None,
-        images: ImageInput | list[ImageInput] | None,
-    ) -> list[Message]:
-        image_urls = self._normalize_images(images)
-
-        if prompt is not None and not isinstance(prompt, str):
-            raise TypeError("prompt must be a string")
-        if prompt is None and not image_urls:
-            raise ValueError("Either prompt or images must be provided")
-
-        content: list[dict[str, Any]] = []
-        if prompt:
-            content.append({"type": "input_text", "text": prompt})
-        for image_url in image_urls:
-            content.append({"type": "input_image", "image_url": image_url})
-
-        if not content:
-            raise ValueError("Either prompt or images must be provided")
-        if len(content) == 1 and content[0]["type"] == "input_text":
-            return [{"role": "user", "content": content[0]["text"]}]
-        return [{"role": "user", "content": content}]
-
-    def _normalize_images(self, images: ImageInput | list[ImageInput] | None) -> list[str]:
-        if images is None:
-            return []
-
-        raw_items: list[ImageInput]
-        if isinstance(images, (str, Path)):
-            raw_items = [images]
-        elif isinstance(images, list):
-            raw_items = images
-        else:
-            raise TypeError("images must be a string/Path or list of string/Path")
-
-        normalized: list[str] = []
-        for item in raw_items:
-            normalized.append(self._coerce_image_to_url(item))
-        return normalized
-
-    def _coerce_image_to_url(self, image: ImageInput) -> str:
-        if isinstance(image, Path):
-            return self._path_to_data_url(image)
-
-        value = image.strip()
-        if value.startswith(("http://", "https://", "data:")):
-            return value
-        return self._path_to_data_url(Path(value).expanduser())
-
-    def _path_to_data_url(self, path: Path) -> str:
-        if not path.is_file():
-            raise FileNotFoundError(f"image file not found: {path}")
-
-        mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
-        return f"data:{mime_type};base64,{encoded}"
+    def _normalize_initial_messages(self, messages: listMessage | None) -> listMessage:
+        if messages is None:
+            raise ValueError("`messages` must be a non-empty list")
+        if not isinstance(messages, list):
+            raise TypeError("`messages` must be a non-empty list")
+        if not messages:
+            raise ValueError("`messages` must be a non-empty list")
+        return messages
 
     def _normalize_tools(
         self,
