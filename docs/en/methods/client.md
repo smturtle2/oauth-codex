@@ -12,6 +12,12 @@ from oauth_codex import Client
 client = Client()
 ```
 
+Authenticate right away at construction time:
+
+```python
+client = Client(authenticate_on_init=True)
+```
+
 ## Core Methods
 
 - `generate(...)`: returns final text output, or a JSON object when `output_schema` is set.

@@ -27,6 +27,12 @@ text = client.generate([{"role": "user", "content": "hello"}])
 print(text)
 ```
 
+클라이언트 생성 시 즉시 인증하려면:
+
+```python
+client = Client(authenticate_on_init=True)
+```
+
 ## 이미지 입력
 
 ```python

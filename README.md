@@ -27,6 +27,12 @@ text = client.generate([{"role": "user", "content": "hello"}])
 print(text)
 ```
 
+Authenticate immediately during client construction:
+
+```python
+client = Client(authenticate_on_init=True)
+```
+
 ## Image Input
 
 ```python

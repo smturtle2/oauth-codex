@@ -138,10 +138,10 @@ def _test_image_input_messages(client: Any, model: str, image_url: str) -> bool:
 
 
 def main() -> int:
-    from oauth_codex import OAuthCodexClient
+    from oauth_codex import Client
 
     args = _build_parser().parse_args()
-    client = OAuthCodexClient()
+    client = Client()
 
     checks = [
         _test_output_schema_and_reasoning(client, args.model),

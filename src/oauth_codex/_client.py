@@ -26,6 +26,29 @@ StructuredOutputSchema = type[BaseModel] | dict[str, Any]
 
 
 class OAuthCodexClient(SyncAPIClient):
+    """Public single-entry client for oauth-codex.
+
+    This client wraps the OAuth-backed responses engine and exposes a
+    generate-first workflow:
+
+    - `generate` and `agenerate` return final text, or a validated JSON object
+      when `output_schema` is provided.
+    - `stream` and `astream` yield text deltas while still supporting
+      automatic tool-call continuation rounds.
+
+    Public attributes:
+        default_model: Model used when `model` is omitted. Defaults to
+            `"gpt-5.3-codex"`.
+        max_tool_rounds: Maximum number of automatic tool continuation rounds
+            before raising `RuntimeError`.
+
+    Example:
+        from oauth_codex import Client
+
+        client = Client(authenticate_on_init=True)
+        text = client.generate([{"role": "user", "content": "hello"}])
+    """
+
     def __init__(
         self,
         *,
@@ -40,7 +63,28 @@ class OAuthCodexClient(SyncAPIClient):
         on_request_end: Any | None = None,
         on_auth_refresh: Any | None = None,
         on_error: Any | None = None,
+        authenticate_on_init: bool = False,
     ) -> None:
+        """Create a `Client` instance.
+
+        Args:
+            oauth_config: Optional OAuth endpoint/client configuration.
+            token_store: Token persistence backend. If omitted, a fallback
+                keyring/file store is used.
+            base_url: Base URL for Codex backend requests.
+            chatgpt_base_url: Legacy alias for `base_url`. `base_url` takes
+                precedence when both are provided.
+            timeout: Request timeout in seconds.
+            max_retries: Number of retry attempts for retryable failures.
+            compat_storage_dir: Optional local compatibility storage path.
+            on_request_start: Optional callback invoked when a request starts.
+            on_request_end: Optional callback invoked when a request ends.
+            on_auth_refresh: Optional callback invoked after token refresh.
+            on_error: Optional callback invoked when request/auth errors occur.
+            authenticate_on_init: When `True`, perform authentication during
+                client construction. If no stored token exists, interactive
+                login is started immediately.
+        """
         super().__init__()
 
         resolved_base_url = (
@@ -63,23 +107,76 @@ class OAuthCodexClient(SyncAPIClient):
         )
         self.default_model = DEFAULT_MODEL
         self.max_tool_rounds = DEFAULT_MAX_TOOL_ROUNDS
+        if authenticate_on_init:
+            self.authenticate()
 
     def is_authenticated(self) -> bool:
+        """Return whether usable OAuth tokens are currently available.
+
+        Returns:
+            `True` when a token is available, otherwise `False`.
+        """
         return self._engine.is_authenticated()
 
     def is_expired(self, *, leeway_seconds: int = 60) -> bool:
+        """Return whether the current token is expired or near expiry.
+
+        Args:
+            leeway_seconds: Safety margin in seconds added before expiry check.
+
+        Returns:
+            `True` if the token is expired within the given leeway.
+        """
         return self._engine.is_expired(leeway_seconds=leeway_seconds)
 
     def refresh_if_needed(self, *, force: bool = False) -> bool:
+        """Refresh tokens when needed.
+
+        Args:
+            force: Refresh even when token is not currently expired.
+
+        Returns:
+            `True` if refresh happened and succeeded, otherwise `False`.
+        """
         return self._engine.refresh_if_needed(force=force)
 
     async def arefresh_if_needed(self, *, force: bool = False) -> bool:
+        """Async version of `refresh_if_needed`.
+
+        Args:
+            force: Refresh even when token is not currently expired.
+
+        Returns:
+            `True` if refresh happened and succeeded, otherwise `False`.
+        """
         return await self._engine.arefresh_if_needed(force=force)
 
+    def authenticate(self) -> None:
+        """Ensure usable OAuth credentials are available now.
+
+        This loads stored credentials, starts interactive login when missing,
+        and refreshes tokens when expired.
+        """
+        self._engine._ensure_authenticated_sync()
+
     def login(self) -> None:
+        """Run interactive OAuth login flow in the current thread.
+
+        Raises:
+            OAuthCallbackParseError: If callback URL parsing fails.
+            OAuthStateMismatchError: If OAuth state verification fails.
+            TokenExchangeError: If code-to-token exchange fails.
+        """
         self._engine.login()
 
     async def alogin(self) -> None:
+        """Run interactive OAuth login flow without blocking the event loop.
+
+        Raises:
+            OAuthCallbackParseError: If callback URL parsing fails.
+            OAuthStateMismatchError: If OAuth state verification fails.
+            TokenExchangeError: If code-to-token exchange fails.
+        """
         await asyncio.to_thread(self._engine.login)
 
     def generate(
@@ -95,6 +192,53 @@ class OAuthCodexClient(SyncAPIClient):
         output_schema: StructuredOutputSchema | None = None,
         strict_output: bool | None = None,
     ) -> str | dict[str, Any]:
+        """Generate a final response with automatic tool execution.
+
+        Args:
+            messages: Non-empty list of response input messages.
+            tools: Optional list of Python callables used for automatic
+                function-calling rounds.
+            model: Optional model override. Uses `default_model` when omitted.
+            reasoning_effort: Reasoning intensity (`"low"`, `"medium"`,
+                `"high"`).
+            temperature: Sampling temperature.
+            top_p: Nucleus sampling probability.
+            max_output_tokens: Maximum generated output tokens.
+            output_schema: Optional structured-output schema. Accepts a
+                Pydantic model type or JSON schema dict.
+            strict_output: Strict schema mode. When `output_schema` is set and
+                `strict_output` is omitted, strict mode is enabled by default.
+
+        Returns:
+            Final text output, or a validated JSON object when `output_schema`
+            is provided.
+
+        Raises:
+            ValueError: If `messages` is missing/empty, or structured output is
+                not valid JSON.
+            TypeError: If `messages` is not a list, `tools` are invalid, or
+                structured output is not a JSON object.
+            RuntimeError: If automatic tool execution exceeds
+                `max_tool_rounds`.
+            pydantic.ValidationError: If a Pydantic `output_schema` fails
+                strict validation.
+
+        Examples:
+            Basic text generation:
+                text = client.generate([{"role": "user", "content": "hello"}])
+
+            Structured output:
+                from pydantic import BaseModel
+
+                class Summary(BaseModel):
+                    title: str
+                    score: int
+
+                data = client.generate(
+                    [{"role": "user", "content": "Return JSON"}],
+                    output_schema=Summary,
+                )
+        """
         messages = self._normalize_initial_messages(messages)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
         response_format, effective_strict_output = self._resolve_structured_output_options(
@@ -155,6 +299,40 @@ class OAuthCodexClient(SyncAPIClient):
         output_schema: StructuredOutputSchema | None = None,
         strict_output: bool | None = None,
     ) -> str | dict[str, Any]:
+        """Async response generation with automatic tool execution.
+
+        Args:
+            messages: Non-empty list of response input messages.
+            tools: Optional list of Python callables used for automatic
+                function-calling rounds.
+            model: Optional model override. Uses `default_model` when omitted.
+            reasoning_effort: Reasoning intensity (`"low"`, `"medium"`,
+                `"high"`).
+            temperature: Sampling temperature.
+            top_p: Nucleus sampling probability.
+            max_output_tokens: Maximum generated output tokens.
+            output_schema: Optional structured-output schema. Accepts a
+                Pydantic model type or JSON schema dict.
+            strict_output: Strict schema mode. When `output_schema` is set and
+                `strict_output` is omitted, strict mode is enabled by default.
+
+        Returns:
+            Final text output, or a validated JSON object when `output_schema`
+            is provided.
+
+        Raises:
+            ValueError: If `messages` is missing/empty, or structured output is
+                not valid JSON.
+            TypeError: If `messages` is not a list, `tools` are invalid, or
+                structured output is not a JSON object.
+            RuntimeError: If automatic tool execution exceeds
+                `max_tool_rounds`.
+            pydantic.ValidationError: If a Pydantic `output_schema` fails
+                strict validation.
+
+        Examples:
+            text = await client.agenerate([{"role": "user", "content": "hello"}])
+        """
         messages = self._normalize_initial_messages(messages)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
         response_format, effective_strict_output = self._resolve_structured_output_options(
@@ -215,6 +393,32 @@ class OAuthCodexClient(SyncAPIClient):
         output_schema: StructuredOutputSchema | None = None,
         strict_output: bool | None = None,
     ) -> Iterator[str]:
+        """Stream text deltas with automatic tool execution rounds.
+
+        Args:
+            messages: Non-empty list of response input messages.
+            tools: Optional list of Python callables used for automatic
+                function-calling rounds.
+            model: Optional model override. Uses `default_model` when omitted.
+            reasoning_effort: Reasoning intensity (`"low"`, `"medium"`,
+                `"high"`).
+            temperature: Sampling temperature.
+            top_p: Nucleus sampling probability.
+            max_output_tokens: Maximum generated output tokens.
+            output_schema: Optional structured-output schema forwarded to the
+                backend. Stream output is still text deltas only.
+            strict_output: Strict schema mode. When `output_schema` is set and
+                `strict_output` is omitted, strict mode is enabled by default.
+
+        Yields:
+            Text delta chunks as they arrive.
+
+        Raises:
+            ValueError: If `messages` is missing/empty.
+            TypeError: If `messages` is not a list or `tools` are invalid.
+            RuntimeError: If automatic tool execution exceeds
+                `max_tool_rounds`.
+        """
         messages = self._normalize_initial_messages(messages)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
         response_format, effective_strict_output = self._resolve_structured_output_options(
@@ -275,6 +479,32 @@ class OAuthCodexClient(SyncAPIClient):
         output_schema: StructuredOutputSchema | None = None,
         strict_output: bool | None = None,
     ) -> AsyncIterator[str]:
+        """Async stream of text deltas with automatic tool execution rounds.
+
+        Args:
+            messages: Non-empty list of response input messages.
+            tools: Optional list of Python callables used for automatic
+                function-calling rounds.
+            model: Optional model override. Uses `default_model` when omitted.
+            reasoning_effort: Reasoning intensity (`"low"`, `"medium"`,
+                `"high"`).
+            temperature: Sampling temperature.
+            top_p: Nucleus sampling probability.
+            max_output_tokens: Maximum generated output tokens.
+            output_schema: Optional structured-output schema forwarded to the
+                backend. Stream output is still text deltas only.
+            strict_output: Strict schema mode. When `output_schema` is set and
+                `strict_output` is omitted, strict mode is enabled by default.
+
+        Yields:
+            Text delta chunks as they arrive.
+
+        Raises:
+            ValueError: If `messages` is missing/empty.
+            TypeError: If `messages` is not a list or `tools` are invalid.
+            RuntimeError: If automatic tool execution exceeds
+                `max_tool_rounds`.
+        """
         messages = self._normalize_initial_messages(messages)
         normalized_tools, tools_by_name = self._normalize_tools(tools)
         response_format, effective_strict_output = self._resolve_structured_output_options(

@@ -39,11 +39,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    from oauth_codex import AuthRequiredError, OAuthCodexClient
+    from oauth_codex import AuthRequiredError, Client
 
     args = _build_parser().parse_args()
 
-    client = OAuthCodexClient(base_url=args.base_url)
+    client = Client(base_url=args.base_url)
 
     if client.is_authenticated():
         print("Already authenticated. Reusing saved credentials.")

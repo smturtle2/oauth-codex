@@ -12,6 +12,12 @@ from oauth_codex import Client
 client = Client()
 ```
 
+생성 시 즉시 인증하려면:
+
+```python
+client = Client(authenticate_on_init=True)
+```
+
 ## 핵심 메서드
 
 - `generate(...)`: 최종 텍스트를 반환하며, `output_schema` 사용 시 JSON 객체를 반환합니다.

@@ -1,10 +1,26 @@
+"""Core public data types used by oauth-codex.
+
+`Message` represents a single response input message dictionary, and
+`listMessage` is the list container passed to `Client.generate`,
+`Client.stream`, `Client.agenerate`, and `Client.astream`.
+
+Recommended minimal message shape:
+
+    [{"role": "user", "content": "hello"}]
+
+`content` may also be a list of input items such as `input_text` and
+`input_image`.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal, Protocol, TypeAlias
 
+#: A single response input message item (for example role/content dict).
 Message: TypeAlias = dict[str, Any]
+#: List of response input messages accepted by `Client` generation methods.
 listMessage: TypeAlias = list[Message]
 ValidationMode: TypeAlias = Literal["warn", "error", "ignore"]
 StoreBehavior: TypeAlias = Literal["auto_disable", "error", "passthrough"]
