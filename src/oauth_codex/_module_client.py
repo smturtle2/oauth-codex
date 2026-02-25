@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from ._client import OAuthCodexClient
+from ._sdk_client import Client
 from .auth.config import OAuthConfig
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ default_headers: dict[str, str] | None = None
 default_query: dict[str, object] | None = None
 http_client: Any | None = None
 
-_client: OAuthCodexClient | None = None
+_client: Client | None = None
 
 
 def _build_oauth_config() -> OAuthConfig:
@@ -52,17 +52,14 @@ def _build_oauth_config() -> OAuthConfig:
     return config
 
 
-def _load_client() -> OAuthCodexClient:
+def _load_client() -> Client:
     global _client
     if _client is None:
-        _client = OAuthCodexClient(
+        _client = Client(
             oauth_config=_build_oauth_config(),
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries,
-            default_headers=default_headers,
-            default_query=default_query,
-            http_client=http_client,
         )
     return _client
 

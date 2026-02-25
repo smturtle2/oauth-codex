@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from . import errors, types
-from ._client import AsyncClient, Client, OAuthCodexClient
+from ._sdk_client import AsyncClient, Client
 
 from ._exceptions import (
     APIConnectionError,
@@ -25,12 +25,9 @@ __all__ = [
     "types",
     "errors",
     "__title__",
-    "AsyncClient",
     "__version__",
     "Client",
     "AsyncClient",
-
-    "OAuthCodexClient",
     "listMessage",
     "CodexError",
     "APIError",

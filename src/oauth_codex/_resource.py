@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ._client import OAuthCodexClient, AsyncOAuthCodexClient
+    from ._sdk_client import AsyncClient, Client
 
 
 class SyncAPIResource:
-    _client: OAuthCodexClient
+    _client: Client
 
-    def __init__(self, client: OAuthCodexClient) -> None:
+    def __init__(self, client: Client) -> None:
         self._client = client
 
     @property
@@ -22,9 +22,9 @@ class SyncAPIResource:
 
 
 class AsyncAPIResource:
-    _client: AsyncOAuthCodexClient
+    _client: AsyncClient
 
-    def __init__(self, client: AsyncOAuthCodexClient) -> None:
+    def __init__(self, client: AsyncClient) -> None:
         self._client = client
 
     @property

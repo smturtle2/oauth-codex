@@ -9,9 +9,6 @@ OAuth PKCE-based Python SDK for the Codex backend — version 3.x.
 - **OpenAI-style API**: Familiar `client.chat.completions.create` and `client.responses.create` interfaces.
 - **Strict Sync/Async Separation**: `oauth_codex.Client` for synchronous code; `oauth_codex.AsyncClient` for async code. Never mix them.
 - **OAuth PKCE Only**: Authentication is exclusively via OAuth PKCE. No API keys are supported or required.
-- **Automatic Tool Execution**: Built-in function-calling loop with configurable continuation rounds.
-- **Structured Output**: Native Pydantic model and JSON Schema validation for model responses.
-- **Legacy Compatibility**: `.generate()` and `.stream()` methods preserved for backward compatibility.
 
 ## Installation
 
@@ -150,101 +147,6 @@ response = await client.responses.create(
 
 Both classes expose identical resource namespaces: `chat`, `responses`, `files`, `vector_stores`, `models`.
 
-## Legacy API
-
-The `.generate()` / `.stream()` methods (and their async counterparts) are preserved for backward compatibility. They provide a generate-first workflow with automatic multi-round tool execution built in.
-
-### generate / agenerate
-
-```python
-# Sync
-text = client.generate(
-    messages=[{"role": "user", "content": "Summarize the Rust ownership model."}],
-    model="gpt-5.3-codex",           # optional, uses default_model otherwise
-    reasoning_effort="medium",        # "low" | "medium" | "high"
-)
-print(text)
-
-# Async (on Client)
-text = await client.agenerate(
-    messages=[{"role": "user", "content": "Summarize the Rust ownership model."}],
-)
-
-# Async (on AsyncClient — method is named generate)
-text = await async_client.generate(
-    messages=[{"role": "user", "content": "Summarize the Rust ownership model."}],
-)
-```
-
-### stream / astream
-
-```python
-# Sync
-for chunk in client.stream(
-    messages=[{"role": "user", "content": "Tell me a story."}],
-):
-    print(chunk, end="", flush=True)
-
-# Async (on Client)
-async for chunk in client.astream(
-    messages=[{"role": "user", "content": "Tell me a story."}],
-):
-    print(chunk, end="", flush=True)
-
-# Async (on AsyncClient — method is named stream)
-async for chunk in async_client.stream(
-    messages=[{"role": "user", "content": "Tell me a story."}],
-):
-    print(chunk, end="", flush=True)
-```
-
-### Automatic Tool Execution
-
-Pass Python callables as `tools`. The SDK calls them automatically and feeds results back until the model produces a final answer or `max_tool_rounds` is reached.
-
-```python
-def get_weather(location: str) -> str:
-    return f"The weather in {location} is sunny, 22 °C."
-
-text = client.generate(
-    messages=[{"role": "user", "content": "What is the weather in Seoul?"}],
-    tools=[get_weather],
-)
-print(text)
-```
-
-Async tools are supported in `agenerate` / `AsyncClient.generate`:
-
-```python
-async def fetch_price(symbol: str) -> str:
-    ...  # async I/O
-    return "105.3"
-
-text = await client.agenerate(
-    messages=[{"role": "user", "content": "What is the price of AAPL?"}],
-    tools=[fetch_price],
-)
-```
-
-### Structured Output
-
-Pass a Pydantic model or a JSON Schema dict as `output_schema`. `generate` / `agenerate` parse and validate the response and return a plain dict.
-
-```python
-from pydantic import BaseModel
-
-class UserInfo(BaseModel):
-    name: str
-    age: int
-
-user = client.generate(
-    messages=[{"role": "user", "content": "My name is John and I am 30."}],
-    output_schema=UserInfo,
-)
-print(user["name"])   # "John"
-print(user["age"])    # 30
-```
-
 ## Client Configuration
 
 ```python
@@ -254,7 +156,6 @@ client = Client(
     base_url="https://chatgpt.com/backend-api/codex",  # optional override
     timeout=60.0,                # request timeout in seconds
     max_retries=2,               # retry count for retryable errors
-    compat_storage_dir="/tmp/codex",  # optional local compatibility storage
     authenticate_on_init=True,   # trigger auth during __init__
 )
 ```
