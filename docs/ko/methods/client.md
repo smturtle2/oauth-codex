@@ -2,9 +2,20 @@
 
 # Client 메서드
 
-`oauth-codex` v2는 `Client` 단일 클래스를 제공합니다.
+`oauth-codex`는 두 개의 대칭 클라이언트 클래스를 제공합니다:
+
+| 클래스 | 임포트 | 사용 시점 |
+|---|---|---|
+| `Client` | `from oauth_codex import Client` | 동기(블로킹) 코드 |
+| `AsyncClient` | `from oauth_codex import AsyncClient` | `async`/`await` 코드, 이벤트 루프 |
+
+두 클래스 모두 **동일한** `chat.completions.create`, `generate`, `stream`, `responses` 인터페이스를 제공합니다. `AsyncClient` 메서드는 async-native(`await` / `async for`)이며, `Client` 메서드는 동기입니다 — 단, `agenerate`/`astream` 브릿지 메서드를 통해 sync Client에서 async도 호출 가능합니다.
+
+---
 
 ## 생성
+
+### Sync Client
 
 ```python
 from oauth_codex import Client
@@ -12,128 +23,244 @@ from oauth_codex import Client
 client = Client()
 ```
 
-생성 시 즉시 인증하려면:
+### Async Client
+
+```python
+from oauth_codex import AsyncClient
+
+client = AsyncClient()
+```
+
+생성 시 즉시 인증 (sync 전용):
 
 ```python
 client = Client(authenticate_on_init=True)
 ```
 
-## 핵심 메서드
+---
 
-- `generate(...)`: 최종 텍스트를 반환하며, `output_schema` 사용 시 JSON 객체를 반환합니다.
-- `stream(...)`: 텍스트 delta를 동기 이터레이터로 반환합니다.
-- `agenerate(...)`: async 텍스트 생성이며, `output_schema` 사용 시 JSON 객체를 반환합니다.
-- `astream(...)`: async 텍스트 스트림입니다.
+## 인증
 
-## 공통 주요 옵션
-
-- `messages`: 비어 있지 않은 response input 메시지 리스트
-- `tools`: Python callable 리스트 (function calling 자동 실행)
-- `model`: 생략 시 기본 `gpt-5.3-codex`
-- `reasoning_effort`: `low | medium | high` (기본 `medium`)
-- `temperature`, `top_p`, `max_output_tokens`
-- `output_schema`: structured output용 Pydantic 모델 타입 또는 JSON schema dict
-- `strict_output`: 툴/출력 스키마 strict 모드. `output_schema` 지정 시 기본 `True`
-
-## 텍스트 생성
+토큰은 로컬에 저장되며 자동으로 갱신됩니다. 저장된 토큰이 없거나 만료된 경우 대화형 OAuth 로그인이 실행됩니다.
 
 ```python
-text = client.generate([{"role": "user", "content": "hello"}])
+# 동기: 로그인 완료까지 블록
+client.authenticate()
+
+# 비동기: 이벤트 루프 비블로킹
+await client.authenticate()
+```
+
+생성자 옵션:
+
+```python
+client = Client(authenticate_on_init=True)  # __init__에서 바로 로그인
+```
+
+---
+
+## Chat Completions
+
+기본 인터페이스 — OpenAI Python SDK와 동일합니다.
+
+### Sync 예시
+
+```python
+response = client.chat.completions.create(
+    model="gpt-5.3-codex",
+    messages=[{"role": "user", "content": "안녕!"}],
+)
+print(response.choices[0].message.content)
+```
+
+### Async 예시
+
+```python
+response = await client.chat.completions.create(
+    model="gpt-5.3-codex",
+    messages=[{"role": "user", "content": "안녕 async!"}],
+)
+print(response.choices[0].message.content)
+```
+
+### 시스템 프롬프트 포함 예시
+
+```python
+response = client.chat.completions.create(
+    model="gpt-5.3-codex",
+    messages=[
+        {"role": "system", "content": "당신은 유능한 어시스턴트입니다."},
+        {"role": "user", "content": "리스트를 정렬하는 Python 함수를 작성해줘."},
+    ],
+    temperature=0.7,
+    max_tokens=500,
+)
+print(response.choices[0].message.content)
+```
+
+---
+
+## `generate` — 자동 툴 실행을 포함한 텍스트 생성
+
+`generate`는 최종 텍스트(또는 `output_schema` 지정 시 검증된 dict)를 반환합니다. 멀티 라운드 function calling을 자동으로 처리합니다.
+
+### Sync (`Client`)
+
+```python
+text = client.generate([{"role": "user", "content": "안녕"}])
 print(text)
 ```
 
-## 이미지 입력 분석
+### Async (`AsyncClient`)
 
 ```python
-text = client.generate(
-    [
+text = await client.generate([{"role": "user", "content": "안녕"}])
+print(text)
+```
+
+> **참고:** sync `Client`에도 async 편의 메서드 `agenerate`가 있습니다:
+> `text = await sync_client.agenerate([...])`
+
+---
+
+## `stream` — 스트리밍 텍스트 델타
+
+### Sync 스트리밍 (`Client`)
+
+```python
+for chunk in client.stream([{"role": "user", "content": "이야기를 들려줘"}]):
+    print(chunk, end="", flush=True)
+```
+
+### Async 스트리밍 (`AsyncClient`)
+
+```python
+async for chunk in client.stream([{"role": "user", "content": "이야기를 들려줘"}]):
+    print(chunk, end="", flush=True)
+```
+
+> sync `Client`에도 async 편의 메서드 `astream`이 있습니다.
+
+---
+
+## 이미지 입력 분석
+
+`client.chat.completions.create`로 멀티모달 콘텐츠를 전달합니다:
+
+```python
+response = client.chat.completions.create(
+    model="gpt-5.3-codex",
+    messages=[
         {
             "role": "user",
             "content": [
                 {"type": "input_text", "text": "이 이미지를 설명해줘"},
                 {"type": "input_image", "image_url": "https://example.com/photo.png"},
-                {"type": "input_image", "image_url": "data:image/jpeg;base64,..."},
             ],
         }
     ],
 )
-print(text)
 ```
 
-`input_image` 항목에 URL 또는 data URL을 전달하면 됩니다.
+---
 
 ## Function Calling (자동)
+
+Python callable을 직접 전달하면 됩니다. SDK가 함수 시그니처를 직렬화하고, 툴 정의를 모델에 전송하며, 반환된 호출을 자동으로 실행합니다.
 
 ```python
 def get_weather(city: str) -> dict:
     return {"city": city, "weather": "sunny"}
 
-text = client.generate([{"role": "user", "content": "서울 날씨 알려줘"}], tools=[get_weather])
+# 동기
+text = client.generate(
+    [{"role": "user", "content": "서울 날씨 알려줘"}],
+    tools=[get_weather],
+)
+
+# 비동기
+text = await async_client.generate(
+    [{"role": "user", "content": "서울 날씨 알려줘"}],
+    tools=[get_weather],
+)
 ```
 
-단일 파라미터 Pydantic 입력 툴도 지원합니다.
+`AsyncClient.generate`(및 `Client.agenerate`)에서는 async 툴도 지원됩니다:
 
 ```python
-from pydantic import BaseModel
+async def fetch_data(url: str) -> dict:
+    ...  # async I/O
 
-
-class ToolInput(BaseModel):
-    query: str
-
-
-def tool(input: ToolInput) -> str:
-    return f"Tool received query: {input.query}"
-
-
-text = client.generate([{"role": "user", "content": "툴을 사용해줘"}], tools=[tool])
+text = await async_client.generate([...], tools=[fetch_data])
 ```
 
-툴 실행 예외는 `{ "error": "..." }` 형태로 모델에 전달되어 루프가 이어집니다.
+---
 
 ## Structured Output
 
+Pydantic 모델 또는 JSON Schema dict를 전달하면 응답이 검증된 dict로 반환됩니다.
+
 ```python
 from pydantic import BaseModel
-
 
 class Summary(BaseModel):
     title: str
     score: int
 
-
-out = client.generate([{"role": "user", "content": "JSON을 반환해줘"}], output_schema=Summary)
+out = client.generate(
+    [{"role": "user", "content": "JSON을 반환해줘"}],
+    output_schema=Summary,
+)
 print(out)  # {"title": "...", "score": 1}
 ```
 
-raw JSON schema dict도 지원합니다.
+---
+
+## Responses 리소스 (저수준)
+
+Codex 백엔드 responses API에 직접 접근할 때 사용합니다:
 
 ```python
-out = client.generate(
-    [{"role": "user", "content": "JSON을 반환해줘"}],
-    output_schema={
-        "type": "object",
-        "properties": {"ok": {"type": "boolean"}},
-    },
+# 동기
+response = client.responses.create(
+    model="gpt-5.3-codex",
+    input=[{"role": "user", "content": "코드를 분석해줘."}],
+)
+
+# 비동기
+response = await client.responses.create(
+    model="gpt-5.3-codex",
+    input=[{"role": "user", "content": "코드를 분석해줘."}],
 )
 ```
 
-`stream` / `astream`은 기존처럼 text delta만 반환합니다. structured JSON 파싱은 `generate` / `agenerate`에서만 수행됩니다.
+---
 
-## 스트리밍
+## API 요약
 
-```python
-for delta in client.stream([{"role": "user", "content": "hello"}]):
-    print(delta, end="")
-```
+### `oauth_codex.Client` (동기)
 
-## Async
+| 메서드 | 반환값 |
+|---|---|
+| `client.chat.completions.create(...)` | `ChatCompletion` |
+| `client.responses.create(...)` | raw response |
+| `client.generate(messages, ...)` | `str \| dict` |
+| `client.stream(messages, ...)` | `Iterator[str]` |
+| `client.agenerate(messages, ...)` | `Awaitable[str \| dict]` |
+| `client.astream(messages, ...)` | `AsyncIterator[str]` |
+| `client.authenticate()` | `None` |
 
-```python
-text = await client.agenerate([{"role": "user", "content": "hello"}])
+### `oauth_codex.AsyncClient` (비동기)
 
-async for delta in client.astream([{"role": "user", "content": "hello"}]):
-    print(delta, end="")
-```
+| 메서드 | 반환값 |
+|---|---|
+| `await client.chat.completions.create(...)` | `ChatCompletion` |
+| `await client.responses.create(...)` | raw response |
+| `await client.generate(messages, ...)` | `str \| dict` |
+| `async for chunk in client.stream(...)` | `AsyncIterator[str]` |
+| `await client.authenticate()` | `None` |
+
+---
 
 ## 참고
 

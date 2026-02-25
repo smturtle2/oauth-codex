@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, TypeAlias, TypedDict
+from typing import Mapping, TypeAlias, TypedDict
 
 
 class NotGiven:
@@ -26,6 +26,7 @@ omit = Omit()
 Headers: TypeAlias = Mapping[str, str]
 Query: TypeAlias = Mapping[str, object]
 Body: TypeAlias = object
+Timeout: TypeAlias = float
 
 
 class RequestOptions(TypedDict, total=False):
@@ -35,6 +36,3 @@ class RequestOptions(TypedDict, total=False):
     params: Query
     extra_json: Mapping[str, object]
     idempotency_key: str
-
-
-Timeout: TypeAlias = float

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel as _PydanticBaseModel, ConfigDict
+from pydantic import BaseModel as _PydanticBaseModel
+from pydantic import ConfigDict
 
 
 class BaseModel(_PydanticBaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    @classmethod
+    def from_dict(cls, data: object, *, strict: bool = False) -> Self:
+        return cls.model_validate(data, strict=strict)
 
     def to_dict(
         self,

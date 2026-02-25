@@ -17,6 +17,9 @@ class OpenAIError(OAuthCodexError):
     pass
 
 
+CodexError = OAuthCodexError
+
+
 class APIError(OpenAIError):
     """Base error for request/response failures returned by the API layer.
 
@@ -29,7 +32,13 @@ class APIError(OpenAIError):
         type: Provider error type extracted from `body` when present.
     """
 
-    def __init__(self, message: str, request: httpx.Request | None = None, *, body: object | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        request: httpx.Request | None = None,
+        *,
+        body: object | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.request = request
@@ -55,7 +64,9 @@ class APIStatusError(APIError):
         request_id: Request identifier from `x-request-id` header when present.
     """
 
-    def __init__(self, message: str, *, response: httpx.Response, body: object | None = None) -> None:
+    def __init__(
+        self, message: str, *, response: httpx.Response, body: object | None = None
+    ) -> None:
         super().__init__(message, response.request, body=body)
         self.response = response
         self.status_code = response.status_code
@@ -65,7 +76,12 @@ class APIStatusError(APIError):
 class APIConnectionError(APIError):
     """Network-level connection failure while talking to the API."""
 
-    def __init__(self, *, message: str = "Connection error.", request: httpx.Request | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        message: str = "Connection error.",
+        request: httpx.Request | None = None,
+    ) -> None:
         super().__init__(message, request, body=None)
 
 
@@ -127,8 +143,18 @@ class InternalServerError(APIStatusError):
 class APIResponseValidationError(APIError):
     """API response payload failed SDK-side schema validation."""
 
-    def __init__(self, response: httpx.Response, body: object | None, *, message: str | None = None) -> None:
-        super().__init__(message or "Data returned by API invalid for expected schema.", response.request, body=body)
+    def __init__(
+        self,
+        response: httpx.Response,
+        body: object | None,
+        *,
+        message: str | None = None,
+    ) -> None:
+        super().__init__(
+            message or "Data returned by API invalid for expected schema.",
+            response.request,
+            body=body,
+        )
         self.response = response
         self.status_code = response.status_code
 
@@ -263,7 +289,9 @@ class ToolCallRequiredError(OAuthCodexError):
         tool_calls: Tool call payloads that must be executed.
     """
 
-    def __init__(self, message: str, tool_calls: list[dict[str, Any]] | None = None) -> None:
+    def __init__(
+        self, message: str, tool_calls: list[dict[str, Any]] | None = None
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.tool_calls = tool_calls or []

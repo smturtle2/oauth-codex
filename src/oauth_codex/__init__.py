@@ -1,36 +1,21 @@
 from __future__ import annotations
 
-from . import types
-from ._client import Client, OAuthCodexClient
+from . import errors, types
+from ._client import AsyncClient, Client, OAuthCodexClient
+
 from ._exceptions import (
     APIConnectionError,
     APIError,
-    APIResponseValidationError,
     APIStatusError,
     APITimeoutError,
-    AuthRequiredError,
     AuthenticationError,
     BadRequestError,
+    CodexError,
     ConflictError,
-    ContinuityError,
     InternalServerError,
-    ModelValidationError,
     NotFoundError,
-    NotSupportedError,
-    OAuthCallbackParseError,
-    OAuthCodexError,
-    OAuthStateMismatchError,
-    OpenAIError,
-    ParameterValidationError,
     PermissionDeniedError,
     RateLimitError,
-    SDKRequestError,
-    TokenExchangeError,
-    TokenRefreshError,
-    TokenStoreDeleteError,
-    TokenStoreReadError,
-    TokenStoreWriteError,
-    ToolCallRequiredError,
     UnprocessableEntityError,
 )
 from ._version import __title__, __version__
@@ -38,18 +23,20 @@ from .core_types import listMessage
 
 __all__ = [
     "types",
+    "errors",
     "__title__",
+    "AsyncClient",
     "__version__",
     "Client",
+    "AsyncClient",
+
     "OAuthCodexClient",
     "listMessage",
-    "OAuthCodexError",
-    "OpenAIError",
+    "CodexError",
     "APIError",
     "APIConnectionError",
     "APITimeoutError",
     "APIStatusError",
-    "APIResponseValidationError",
     "BadRequestError",
     "AuthenticationError",
     "PermissionDeniedError",
@@ -58,18 +45,4 @@ __all__ = [
     "UnprocessableEntityError",
     "RateLimitError",
     "InternalServerError",
-    "AuthRequiredError",
-    "TokenRefreshError",
-    "TokenExchangeError",
-    "OAuthCallbackParseError",
-    "OAuthStateMismatchError",
-    "ModelValidationError",
-    "ParameterValidationError",
-    "NotSupportedError",
-    "SDKRequestError",
-    "TokenStoreReadError",
-    "TokenStoreWriteError",
-    "TokenStoreDeleteError",
-    "ContinuityError",
-    "ToolCallRequiredError",
 ]

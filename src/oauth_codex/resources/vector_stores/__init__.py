@@ -1,45 +1,15 @@
-from .file_batches import (
-    AsyncFileBatches,
-    AsyncFileBatchesWithRawResponse,
-    AsyncFileBatchesWithStreamingResponse,
-    FileBatches,
-    FileBatchesWithRawResponse,
-    FileBatchesWithStreamingResponse,
-)
-from .files import (
-    AsyncFiles,
-    AsyncFilesWithRawResponse,
-    AsyncFilesWithStreamingResponse,
-    Files,
-    FilesWithRawResponse,
-    FilesWithStreamingResponse,
-)
-from .vector_stores import (
-    AsyncVectorStores,
-    AsyncVectorStoresWithRawResponse,
-    AsyncVectorStoresWithStreamingResponse,
-    VectorStores,
-    VectorStoresWithRawResponse,
-    VectorStoresWithStreamingResponse,
-)
+from __future__ import annotations
+
+from .files import AsyncFiles, Files, VectorStoreFile, VectorStoreFileList
+from .vector_stores import AsyncVectorStores, VectorStore, VectorStoreList, VectorStores
 
 __all__ = [
     "Files",
     "AsyncFiles",
-    "FilesWithRawResponse",
-    "AsyncFilesWithRawResponse",
-    "FilesWithStreamingResponse",
-    "AsyncFilesWithStreamingResponse",
-    "FileBatches",
-    "AsyncFileBatches",
-    "FileBatchesWithRawResponse",
-    "AsyncFileBatchesWithRawResponse",
-    "FileBatchesWithStreamingResponse",
-    "AsyncFileBatchesWithStreamingResponse",
+    "VectorStoreFile",
+    "VectorStoreFileList",
     "VectorStores",
     "AsyncVectorStores",
-    "VectorStoresWithRawResponse",
-    "AsyncVectorStoresWithRawResponse",
-    "VectorStoresWithStreamingResponse",
-    "AsyncVectorStoresWithStreamingResponse",
+    "VectorStore",
+    "VectorStoreList",
 ]

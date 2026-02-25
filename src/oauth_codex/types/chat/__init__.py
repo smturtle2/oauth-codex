@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from .chat import ChatCompletion
+from .completions import ChatCompletion
 
 __all__ = ["ChatCompletion"]
