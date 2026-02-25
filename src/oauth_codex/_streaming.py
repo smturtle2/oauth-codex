@@ -16,7 +16,10 @@ def _extract_event_data(raw_event: str) -> str | None:
     data_lines: list[str] = []
     for line in raw_event.split("\n"):
         if line.startswith("data:"):
-            data_lines.append(line[5:].lstrip())
+            content = line[5:].lstrip()
+            if content == "[DONE]":
+                return "[DONE]"
+            data_lines.append(content)
 
     if not data_lines:
         return None
@@ -41,12 +44,16 @@ class Stream(Generic[T]):
                 while "\n\n" in buffer:
                     raw_event, buffer = buffer.split("\n\n", 1)
                     data = _extract_event_data(raw_event)
+                    if data == "[DONE]":
+                        return
                     if data is None:
                         continue
                     yield self._cast_event(data)
 
             if buffer:
                 data = _extract_event_data(buffer)
+                if data == "[DONE]":
+                    return
                 if data is not None:
                     yield self._cast_event(data)
         finally:
@@ -71,12 +78,16 @@ class AsyncStream(Generic[T]):
                 while "\n\n" in buffer:
                     raw_event, buffer = buffer.split("\n\n", 1)
                     data = _extract_event_data(raw_event)
+                    if data == "[DONE]":
+                        return
                     if data is None:
                         continue
                     yield self._cast_event(data)
 
             if buffer:
                 data = _extract_event_data(buffer)
+                if data == "[DONE]":
+                    return
                 if data is not None:
                     yield self._cast_event(data)
         finally:

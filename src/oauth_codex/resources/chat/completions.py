@@ -167,7 +167,7 @@ def _parse_tool_arguments(arguments: Any) -> dict[str, Any]:
     if isinstance(arguments, dict):
         return arguments
     if not isinstance(arguments, str) or not arguments.strip():
-        return {}
+        raise ValueError(f"Tool arguments must be a valid JSON object string, got: {arguments!r}")
     
     try:
         parsed = json.loads(arguments)
@@ -175,11 +175,9 @@ def _parse_tool_arguments(arguments: Any) -> dict[str, Any]:
             parsed = json.loads(parsed)
         if isinstance(parsed, dict):
             return parsed
-    except Exception:
-        pass
-        
-    return {}
-
+        raise ValueError("Parsed arguments is not a dictionary")
+    except Exception as e:
+        raise ValueError(f"Failed to parse tool arguments: {arguments!r}") from e
 def _run_tool_function(*, fn: Any, arguments: Any) -> Any:
     if isinstance(arguments, dict):
         return fn(**arguments)
