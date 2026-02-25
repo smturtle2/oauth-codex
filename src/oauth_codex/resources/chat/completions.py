@@ -104,9 +104,16 @@ def _extract_tool_calls(response_data: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(name, str) or not name:
             continue
 
-        arguments = item.get("arguments")
+        # In Codex, arguments are often in `arguments_json` or `arguments` as a dict
+        arguments = item.get("arguments_json")
         if not isinstance(arguments, str):
-            arguments = "{}"
+            args_dict = item.get("arguments")
+            if isinstance(args_dict, dict):
+                arguments = json.dumps(args_dict)
+            elif isinstance(args_dict, str):
+                arguments = args_dict
+            else:
+                arguments = "{}"
 
         call_id = item.get("call_id") or item.get("id")
         if not isinstance(call_id, str) or not call_id:
@@ -124,7 +131,6 @@ def _extract_tool_calls(response_data: dict[str, Any]) -> list[dict[str, Any]]:
         )
 
     return tool_calls
-
 
 def _build_assistant_message(completion: ChatCompletion) -> dict[str, Any]:
     message = completion.choices[0].message
@@ -145,33 +151,39 @@ def _coerce_tool_output_content(value: Any) -> str:
         return str(value)
 
 
-def _parse_tool_arguments(arguments: str) -> Any:
-    if not arguments.strip():
-        return {}
-    try:
-        return json.loads(arguments)
-    except json.JSONDecodeError:
-        return {}
-
-
-def _build_tool_function_map(tools: Any) -> dict[str, Any]:
-    if not isinstance(tools, list):
-        return {}
-
-    functions: dict[str, Any] = {}
+def _build_tool_function_map(tools: list[Any]) -> dict[str, Any]:
+    tool_map = {}
     for tool in tools:
         if callable(tool):
-            name = getattr(tool, "__name__", "")
-            if isinstance(name, str) and name:
-                functions[name] = tool
-    return functions
+            name = getattr(tool, "__name__", "tool")
+            tool_map[name] = tool
+        elif isinstance(tool, dict) and "function" in tool:
+            # Not a callable directly but maybe user wants it? 
+            # OpenAI SDK run_tools specifically requires callables.
+            pass
+    return tool_map
 
+def _parse_tool_arguments(arguments: Any) -> dict[str, Any]:
+    if isinstance(arguments, dict):
+        return arguments
+    if not isinstance(arguments, str) or not arguments.strip():
+        return {}
+    
+    try:
+        parsed = json.loads(arguments)
+        if isinstance(parsed, str):
+            parsed = json.loads(parsed)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+        
+    return {}
 
 def _run_tool_function(*, fn: Any, arguments: Any) -> Any:
     if isinstance(arguments, dict):
         return fn(**arguments)
     return fn(arguments)
-
 
 def _to_chat_completion(
     *,

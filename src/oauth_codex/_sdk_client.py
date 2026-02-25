@@ -59,14 +59,14 @@ class _SyncEngine:
             return self._stream_responses(payload)
 
         response = self._client.request("POST", "/responses", json_data=payload)
-        return _to_namespace(response.json())
+        return response.json()
 
     def responses_input_tokens_count(self, **kwargs: Any) -> Any:
         payload = _payload_without_none(kwargs)
         response = self._client.request(
             "POST", "/responses/input_tokens", json_data=payload
         )
-        return _to_namespace(response.json())
+        return response.json()
 
     def _stream_responses(self, payload: dict[str, Any]) -> Iterator[Any]:
         payload = dict(payload)
@@ -75,7 +75,7 @@ class _SyncEngine:
         events = response.json()
         if isinstance(events, list):
             for event in events:
-                yield _to_namespace(event)
+                yield event
 
 
 class _AsyncEngine:
@@ -88,14 +88,14 @@ class _AsyncEngine:
             return self._stream_responses(payload)
 
         response = await self._client.request("POST", "/responses", json_data=payload)
-        return _to_namespace(response.json())
+        return response.json()
 
     async def aresponses_input_tokens_count(self, **kwargs: Any) -> Any:
         payload = _payload_without_none(kwargs)
         response = await self._client.request(
             "POST", "/responses/input_tokens", json_data=payload
         )
-        return _to_namespace(response.json())
+        return response.json()
 
     async def _stream_responses(self, payload: dict[str, Any]) -> AsyncIterator[Any]:
         payload = dict(payload)
@@ -104,7 +104,7 @@ class _AsyncEngine:
         events = response.json()
         if isinstance(events, list):
             for event in events:
-                yield _to_namespace(event)
+                yield event
 
 
 class Client(SyncAPIClient):
