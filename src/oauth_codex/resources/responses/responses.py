@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Iterator, Literal, overload
+import json
+from typing import Any, AsyncIterator, Iterator, Literal, cast, overload
 
 from ..._resource import AsyncAPIResource, SyncAPIResource
 from ...core_types import Message, ToolInput, ToolResult, TruncationMode, ValidationMode
+from ...tooling import (
+    build_strict_response_format,
+    callable_to_tool_schema,
+    to_responses_tools,
+)
 from ...types.responses import Response, ResponseStreamEvent
 from .._wrappers import (
     async_to_raw_response_wrapper,
@@ -21,6 +27,46 @@ from .input_tokens import (
     InputTokensWithStreamingResponse,
 )
 
+PydanticBaseModel: Any = None
+try:
+    from pydantic import BaseModel as PydanticBaseModel
+except Exception:
+    pass
+
+
+def _is_pydantic_model_type(value: Any) -> bool:
+    return bool(
+        PydanticBaseModel is not None
+        and isinstance(value, type)
+        and issubclass(value, PydanticBaseModel)
+    )
+
+
+def _normalize_response_format(response_format: Any) -> Any:
+    if _is_pydantic_model_type(response_format):
+        return build_strict_response_format(response_format)
+    return response_format
+
+
+def _normalize_tools(tools: list[ToolInput] | None) -> list[Any] | None:
+    if not isinstance(tools, list):
+        return tools
+
+    normalized: list[Any] = []
+    for tool in tools:
+        if callable(tool):
+            normalized.extend(to_responses_tools([callable_to_tool_schema(tool)]))
+            continue
+        normalized.append(tool)
+    return normalized
+
+
+def _parse_text_with_model(response_format: type[Any], text: str) -> Any:
+    try:
+        return response_format.model_validate_json(text)
+    except Exception:
+        return response_format.model_validate(json.loads(text))
+
 
 class Responses(SyncAPIResource):
     @property
@@ -36,7 +82,7 @@ class Responses(SyncAPIResource):
         messages: list[Message] | None = None,
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
-        response_format: dict[str, Any] | None = None,
+        response_format: dict[str, Any] | type[Any] | None = None,
         tool_choice: str | dict[str, Any] | None = None,
         strict_output: bool = False,
         store: bool = False,
@@ -58,8 +104,7 @@ class Responses(SyncAPIResource):
         stream: Literal[False] = False,
         validation_mode: ValidationMode | None = None,
         **extra: Any,
-    ) -> Response:
-        ...
+    ) -> Response: ...
 
     @overload
     def create(
@@ -70,7 +115,7 @@ class Responses(SyncAPIResource):
         messages: list[Message] | None = None,
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
-        response_format: dict[str, Any] | None = None,
+        response_format: dict[str, Any] | type[Any] | None = None,
         tool_choice: str | dict[str, Any] | None = None,
         strict_output: bool = False,
         store: bool = False,
@@ -92,8 +137,7 @@ class Responses(SyncAPIResource):
         stream: Literal[True],
         validation_mode: ValidationMode | None = None,
         **extra: Any,
-    ) -> Iterator[ResponseStreamEvent]:
-        ...
+    ) -> Iterator[ResponseStreamEvent]: ...
 
     def create(
         self,
@@ -103,7 +147,7 @@ class Responses(SyncAPIResource):
         messages: list[Message] | None = None,
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
-        response_format: dict[str, Any] | None = None,
+        response_format: dict[str, Any] | type[Any] | None = None,
         tool_choice: str | dict[str, Any] | None = None,
         strict_output: bool = False,
         store: bool = False,
@@ -126,6 +170,8 @@ class Responses(SyncAPIResource):
         validation_mode: ValidationMode | None = None,
         **extra: Any,
     ) -> Response | Iterator[ResponseStreamEvent]:
+        response_format = _normalize_response_format(response_format)
+        tools = _normalize_tools(tools)
         out = self._client._engine.responses_create(
             model=model,
             input=input,
@@ -159,6 +205,29 @@ class Responses(SyncAPIResource):
             return iter_engine_events(out)
         return response_from_engine(out)
 
+    def parse(
+        self,
+        *,
+        model: str,
+        response_format: type[Any],
+        **kwargs: Any,
+    ) -> Response:
+        if not _is_pydantic_model_type(response_format):
+            raise TypeError("response_format must be a Pydantic model type")
+
+        response = self.create(
+            model=model,
+            response_format=cast(Any, response_format),
+            stream=False,
+            **kwargs,
+        )
+        if not isinstance(response, Response):
+            raise TypeError("parse does not support stream=True")
+
+        parsed = _parse_text_with_model(response_format, response.output_text)
+        setattr(response, "parsed", parsed)
+        return response
+
     def stream(
         self,
         *,
@@ -167,7 +236,7 @@ class Responses(SyncAPIResource):
         messages: list[Message] | None = None,
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
-        response_format: dict[str, Any] | None = None,
+        response_format: dict[str, Any] | type[Any] | None = None,
         tool_choice: str | dict[str, Any] | None = None,
         strict_output: bool = False,
         store: bool = False,
@@ -220,11 +289,11 @@ class Responses(SyncAPIResource):
         )
 
     @property
-    def with_raw_response(self) -> ResponsesWithRawResponse:
+    def with_raw_response(self) -> Any:
         return ResponsesWithRawResponse(self)
 
     @property
-    def with_streaming_response(self) -> ResponsesWithStreamingResponse:
+    def with_streaming_response(self) -> Any:
         return ResponsesWithStreamingResponse(self)
 
 
@@ -242,7 +311,7 @@ class AsyncResponses(AsyncAPIResource):
         messages: list[Message] | None = None,
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
-        response_format: dict[str, Any] | None = None,
+        response_format: dict[str, Any] | type[Any] | None = None,
         tool_choice: str | dict[str, Any] | None = None,
         strict_output: bool = False,
         store: bool = False,
@@ -264,8 +333,7 @@ class AsyncResponses(AsyncAPIResource):
         stream: Literal[False] = False,
         validation_mode: ValidationMode | None = None,
         **extra: Any,
-    ) -> Response:
-        ...
+    ) -> Response: ...
 
     @overload
     async def create(
@@ -276,7 +344,7 @@ class AsyncResponses(AsyncAPIResource):
         messages: list[Message] | None = None,
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
-        response_format: dict[str, Any] | None = None,
+        response_format: dict[str, Any] | type[Any] | None = None,
         tool_choice: str | dict[str, Any] | None = None,
         strict_output: bool = False,
         store: bool = False,
@@ -298,8 +366,7 @@ class AsyncResponses(AsyncAPIResource):
         stream: Literal[True],
         validation_mode: ValidationMode | None = None,
         **extra: Any,
-    ) -> AsyncIterator[ResponseStreamEvent]:
-        ...
+    ) -> AsyncIterator[ResponseStreamEvent]: ...
 
     async def create(
         self,
@@ -309,7 +376,7 @@ class AsyncResponses(AsyncAPIResource):
         messages: list[Message] | None = None,
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
-        response_format: dict[str, Any] | None = None,
+        response_format: dict[str, Any] | type[Any] | None = None,
         tool_choice: str | dict[str, Any] | None = None,
         strict_output: bool = False,
         store: bool = False,
@@ -332,6 +399,8 @@ class AsyncResponses(AsyncAPIResource):
         validation_mode: ValidationMode | None = None,
         **extra: Any,
     ) -> Response | AsyncIterator[ResponseStreamEvent]:
+        response_format = _normalize_response_format(response_format)
+        tools = _normalize_tools(tools)
         out = await self._client._engine.aresponses_create(
             model=model,
             input=input,
@@ -365,6 +434,29 @@ class AsyncResponses(AsyncAPIResource):
             return aiter_engine_events(out)
         return response_from_engine(out)
 
+    async def aparse(
+        self,
+        *,
+        model: str,
+        response_format: type[Any],
+        **kwargs: Any,
+    ) -> Response:
+        if not _is_pydantic_model_type(response_format):
+            raise TypeError("response_format must be a Pydantic model type")
+
+        response = await self.create(
+            model=model,
+            response_format=cast(Any, response_format),
+            stream=False,
+            **kwargs,
+        )
+        if not isinstance(response, Response):
+            raise TypeError("aparse does not support stream=True")
+
+        parsed = _parse_text_with_model(response_format, response.output_text)
+        setattr(response, "parsed", parsed)
+        return response
+
     async def stream(
         self,
         *,
@@ -373,7 +465,7 @@ class AsyncResponses(AsyncAPIResource):
         messages: list[Message] | None = None,
         tools: list[ToolInput] | None = None,
         tool_results: list[ToolResult] | None = None,
-        response_format: dict[str, Any] | None = None,
+        response_format: dict[str, Any] | type[Any] | None = None,
         tool_choice: str | dict[str, Any] | None = None,
         strict_output: bool = False,
         store: bool = False,
@@ -426,11 +518,11 @@ class AsyncResponses(AsyncAPIResource):
         )
 
     @property
-    def with_raw_response(self) -> AsyncResponsesWithRawResponse:
+    def with_raw_response(self) -> Any:
         return AsyncResponsesWithRawResponse(self)
 
     @property
-    def with_streaming_response(self) -> AsyncResponsesWithStreamingResponse:
+    def with_streaming_response(self) -> Any:
         return AsyncResponsesWithStreamingResponse(self)
 
 
@@ -459,4 +551,6 @@ class AsyncResponsesWithStreamingResponse:
     def __init__(self, responses: AsyncResponses) -> None:
         self.create = async_to_streamed_response_wrapper(responses.create)
         self.stream = async_to_streamed_response_wrapper(responses.stream)
-        self.input_tokens = AsyncInputTokensWithStreamingResponse(responses.input_tokens)
+        self.input_tokens = AsyncInputTokensWithStreamingResponse(
+            responses.input_tokens
+        )
