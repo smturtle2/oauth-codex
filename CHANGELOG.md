@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.2.3
+
+### Fixed
+
+- Updated `client.beta.chat.completions.run_tools`/`arun_tools` to follow modern Responses API tool loop semantics.
+- Tool execution rounds now submit `function_call_output` items with `call_id` and carry `previous_response_id` across rounds.
+- Added backend contract tests to validate multi-round tool execution flow (sync/async), payload shape, and response ID rollover behavior.
+
 ## 2.3.0
 
 ### Added

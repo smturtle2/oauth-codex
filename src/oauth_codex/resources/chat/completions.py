@@ -132,6 +132,7 @@ def _extract_tool_calls(response_data: dict[str, Any]) -> list[dict[str, Any]]:
 
     return tool_calls
 
+
 def _build_assistant_message(completion: ChatCompletion) -> dict[str, Any]:
     message = completion.choices[0].message
     out: dict[str, Any] = {"role": "assistant"}
@@ -151,6 +152,18 @@ def _coerce_tool_output_content(value: Any) -> str:
         return str(value)
 
 
+def _build_function_call_output_item(
+    *, tool_call_id: str, output: Any
+) -> dict[str, Any]:
+    if not isinstance(tool_call_id, str) or not tool_call_id.strip():
+        raise ValueError("Tool call id must be a non-empty string")
+    return {
+        "type": "function_call_output",
+        "call_id": tool_call_id,
+        "output": _coerce_tool_output_content(output),
+    }
+
+
 def _build_tool_function_map(tools: list[Any]) -> dict[str, Any]:
     tool_map = {}
     for tool in tools:
@@ -158,17 +171,20 @@ def _build_tool_function_map(tools: list[Any]) -> dict[str, Any]:
             name = getattr(tool, "__name__", "tool")
             tool_map[name] = tool
         elif isinstance(tool, dict) and "function" in tool:
-            # Not a callable directly but maybe user wants it? 
+            # Not a callable directly but maybe user wants it?
             # OpenAI SDK run_tools specifically requires callables.
             pass
     return tool_map
+
 
 def _parse_tool_arguments(arguments: Any) -> dict[str, Any]:
     if isinstance(arguments, dict):
         return arguments
     if not isinstance(arguments, str) or not arguments.strip():
-        raise ValueError(f"Tool arguments must be a valid JSON object string, got: {arguments!r}")
-    
+        raise ValueError(
+            f"Tool arguments must be a valid JSON object string, got: {arguments!r}"
+        )
+
     try:
         parsed = json.loads(arguments)
         if isinstance(parsed, str):
@@ -178,10 +194,13 @@ def _parse_tool_arguments(arguments: Any) -> dict[str, Any]:
         raise ValueError("Parsed arguments is not a dictionary")
     except Exception as e:
         raise ValueError(f"Failed to parse tool arguments: {arguments!r}") from e
+
+
 def _run_tool_function(*, fn: Any, arguments: Any) -> Any:
     if isinstance(arguments, dict):
         return fn(**arguments)
     return fn(arguments)
+
 
 def _to_chat_completion(
     *,
@@ -314,15 +333,20 @@ class BetaCompletions(Completions):
         if not tool_functions:
             raise ValueError("run_tools requires callable tools")
 
-        conversation = [dict(message) for message in messages]
+        round_input = [dict(message) for message in messages]
+        request_kwargs = dict(kwargs)
+        previous_response_id = request_kwargs.pop("previous_response_id", None)
 
         for _ in range(max_rounds):
-            completion = self.create(
-                model=model,
-                messages=conversation,
-                tools=tools,
-                **kwargs,
-            )
+            create_kwargs = {
+                "model": model,
+                "messages": round_input,
+                "tools": tools,
+                **request_kwargs,
+            }
+            if previous_response_id is not None:
+                create_kwargs["previous_response_id"] = previous_response_id
+            completion = self.create(**create_kwargs)
 
             if not completion.choices:
                 return completion
@@ -332,7 +356,8 @@ class BetaCompletions(Completions):
             if not tool_calls:
                 return completion
 
-            conversation.append(_build_assistant_message(completion))
+            previous_response_id = completion.id
+            next_input: list[dict[str, Any]] = []
 
             for tool_call in tool_calls:
                 fn_name = tool_call.function.name
@@ -347,13 +372,14 @@ class BetaCompletions(Completions):
                         f"Tool '{fn_name}' returned an awaitable; use arun_tools for async tools"
                     )
 
-                conversation.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": _coerce_tool_output_content(output),
-                    }
+                next_input.append(
+                    _build_function_call_output_item(
+                        tool_call_id=tool_call.id,
+                        output=output,
+                    )
                 )
+
+            round_input = next_input
 
         raise RuntimeError(
             "run_tools exceeded max_rounds without reaching a final response"
@@ -433,15 +459,20 @@ class AsyncBetaCompletions(AsyncCompletions):
         if not tool_functions:
             raise ValueError("arun_tools requires callable tools")
 
-        conversation = [dict(message) for message in messages]
+        round_input = [dict(message) for message in messages]
+        request_kwargs = dict(kwargs)
+        previous_response_id = request_kwargs.pop("previous_response_id", None)
 
         for _ in range(max_rounds):
-            completion = await self.create(
-                model=model,
-                messages=conversation,
-                tools=tools,
-                **kwargs,
-            )
+            create_kwargs = {
+                "model": model,
+                "messages": round_input,
+                "tools": tools,
+                **request_kwargs,
+            }
+            if previous_response_id is not None:
+                create_kwargs["previous_response_id"] = previous_response_id
+            completion = await self.create(**create_kwargs)
 
             if not completion.choices:
                 return completion
@@ -451,7 +482,8 @@ class AsyncBetaCompletions(AsyncCompletions):
             if not tool_calls:
                 return completion
 
-            conversation.append(_build_assistant_message(completion))
+            previous_response_id = completion.id
+            next_input: list[dict[str, Any]] = []
 
             for tool_call in tool_calls:
                 fn_name = tool_call.function.name
@@ -464,13 +496,14 @@ class AsyncBetaCompletions(AsyncCompletions):
                 if inspect.isawaitable(output):
                     output = await output
 
-                conversation.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": _coerce_tool_output_content(output),
-                    }
+                next_input.append(
+                    _build_function_call_output_item(
+                        tool_call_id=tool_call.id,
+                        output=output,
+                    )
                 )
+
+            round_input = next_input
 
         raise RuntimeError(
             "arun_tools exceeded max_rounds without reaching a final response"

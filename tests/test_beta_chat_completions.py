@@ -4,15 +4,15 @@ from typing import Any, cast
 
 import pytest
 
+import oauth_codex
 from conftest import InMemoryTokenStore
-from oauth_codex import AsyncClient, Client
 from oauth_codex.core_types import OAuthTokens
 
 
 def _client() -> Any:
     return cast(
         Any,
-        Client(
+        oauth_codex.Client(
             token_store=InMemoryTokenStore(
                 OAuthTokens(
                     access_token="a", refresh_token="r", expires_at=9_999_999_999
@@ -23,9 +23,10 @@ def _client() -> Any:
 
 
 def _async_client() -> Any:
+    async_client_cls = cast(Any, getattr(oauth_codex, "AsyncClient"))
     return cast(
         Any,
-        AsyncClient(
+        async_client_cls(
             token_store=InMemoryTokenStore(
                 OAuthTokens(
                     access_token="a", refresh_token="r", expires_at=9_999_999_999
@@ -88,12 +89,12 @@ def test_chat_create_returns_tool_calls_without_auto_execution(
 
 def test_beta_run_tools_executes_callables(monkeypatch: pytest.MonkeyPatch) -> None:
     client = _client()
-    captured_inputs: list[list[dict[str, Any]]] = []
+    captured_calls: list[dict[str, Any]] = []
     call_count = {"n": 0}
 
     def fake_create(**kwargs: Any) -> Any:
         call_count["n"] += 1
-        captured_inputs.append(list(kwargs["input"]))
+        captured_calls.append(dict(kwargs))
         if call_count["n"] == 1:
             return _StubResponse(
                 {
@@ -133,8 +134,14 @@ def test_beta_run_tools_executes_callables(monkeypatch: pytest.MonkeyPatch) -> N
 
     assert completion.choices[0].message.content == "3"
     assert call_count["n"] == 2
-    second_round_messages = captured_inputs[1]
-    assert any(message.get("role") == "tool" for message in second_round_messages)
+    second_round_messages = captured_calls[1]["input"]
+    assert captured_calls[1]["previous_response_id"] == "resp_1"
+    assert any(
+        item.get("type") == "function_call_output"
+        and item.get("call_id") == "call_1"
+        and item.get("output") == "3"
+        for item in second_round_messages
+    )
 
 
 @pytest.mark.asyncio
@@ -143,9 +150,11 @@ async def test_beta_arun_tools_supports_async_callables(
 ) -> None:
     client = _async_client()
     call_count = {"n": 0}
+    captured_calls: list[dict[str, Any]] = []
 
-    async def fake_create(**_kwargs: Any) -> Any:
+    async def fake_create(**kwargs: Any) -> Any:
         call_count["n"] += 1
+        captured_calls.append(dict(kwargs))
         if call_count["n"] == 1:
             return _StubResponse(
                 {
@@ -185,3 +194,11 @@ async def test_beta_arun_tools_supports_async_callables(
 
     assert completion.choices[0].message.content == "7"
     assert call_count["n"] == 2
+    second_round_messages = captured_calls[1]["input"]
+    assert captured_calls[1]["previous_response_id"] == "resp_1"
+    assert any(
+        item.get("type") == "function_call_output"
+        and item.get("call_id") == "call_1"
+        and item.get("output") == "7"
+        for item in second_round_messages
+    )
