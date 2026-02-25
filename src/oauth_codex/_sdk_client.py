@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import httpx
 
+from .resources.beta import AsyncBeta, Beta
 from .resources.chat import AsyncChat, Chat
 from .resources.files import AsyncFiles, Files
 from .resources.models import AsyncModels, Models
@@ -128,6 +129,7 @@ class Client(SyncAPIClient):
         self._models: Models | None = None
         self._vector_stores: VectorStores | None = None
         self._chat: Chat | None = None
+        self._beta: Beta | None = None
         self._auth_provider: SyncAuthProvider | None = None
         self._engine = _SyncEngine(self)
 
@@ -167,6 +169,12 @@ class Client(SyncAPIClient):
             self._chat = Chat(cast(Any, self))
         return self._chat
 
+    @property
+    def beta(self) -> Beta:
+        if self._beta is None:
+            self._beta = Beta(cast(Any, self))
+        return self._beta
+
     def request(
         self,
         method: str,
@@ -194,7 +202,7 @@ class Client(SyncAPIClient):
 
     def _build_auth_provider(self) -> SyncAuthProvider:
         return OAuthProvider(
-            token_store=self._token_store,
+            token_store=cast(Any, self._token_store),
             oauth_config=self._oauth_config,
             timeout=self.timeout,
         )
@@ -222,6 +230,7 @@ class AsyncClient(AsyncAPIClient):
         self._models: AsyncModels | None = None
         self._vector_stores: AsyncVectorStores | None = None
         self._chat: AsyncChat | None = None
+        self._beta: AsyncBeta | None = None
         self._auth_provider: AsyncAuthProvider | None = None
         self._engine = _AsyncEngine(self)
 
@@ -261,6 +270,12 @@ class AsyncClient(AsyncAPIClient):
             self._chat = AsyncChat(cast(Any, self))
         return self._chat
 
+    @property
+    def beta(self) -> AsyncBeta:
+        if self._beta is None:
+            self._beta = AsyncBeta(cast(Any, self))
+        return self._beta
+
     async def request(
         self,
         method: str,
@@ -288,7 +303,7 @@ class AsyncClient(AsyncAPIClient):
 
     def _build_auth_provider(self) -> AsyncAuthProvider:
         return OAuthProvider(
-            token_store=self._token_store,
+            token_store=cast(Any, self._token_store),
             oauth_config=self._oauth_config,
             timeout=self.timeout,
         )

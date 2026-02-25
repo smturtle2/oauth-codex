@@ -42,6 +42,11 @@ def test_client_exposes_chat_completions_and_responses_create() -> None:
     assert hasattr(client, "chat")
     assert hasattr(client.chat, "completions")
     assert callable(client.chat.completions.create)
+    assert hasattr(client, "beta")
+    assert hasattr(client.beta, "chat")
+    assert hasattr(client.beta.chat, "completions")
+    assert callable(client.beta.chat.completions.run_tools)
+    assert callable(client.beta.chat.completions.parse)
 
     assert hasattr(client, "responses")
     assert callable(client.responses.create)
