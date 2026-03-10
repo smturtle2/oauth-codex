@@ -13,12 +13,17 @@ sys.path.insert(0, _SRC_PATH_STR)
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="OAuth login + responses API smoke test")
+    parser = argparse.ArgumentParser(description="Responses API smoke test")
     parser.add_argument("--model", default="gpt-5.3-codex", help="Model name")
     parser.add_argument(
         "--prompt",
-        default="Say hello in one short sentence.",
+        default="Explain response streaming in one short paragraph.",
         help="Prompt text",
+    )
+    parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="Use client.responses.stream(...) instead of create(...)",
     )
     return parser
 
@@ -30,14 +35,25 @@ def main() -> int:
     client = Client()
     client.authenticate()
 
+    if args.stream:
+        print("----- stream begin -----")
+        for event in client.responses.stream(
+            model=args.model,
+            input=[{"role": "user", "content": args.prompt}],
+        ):
+            if event.delta:
+                print(event.delta, end="", flush=True)
+        print("\n----- stream end -----")
+        return 0
+
     response = client.responses.create(
         model=args.model,
         input=[{"role": "user", "content": args.prompt}],
     )
 
-    print("----- response -----")
+    print("----- responses.create -----")
     print(response.output_text)
-    print("--------------------")
+    print("----------------------------")
     return 0
 
 

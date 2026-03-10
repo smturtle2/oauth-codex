@@ -2,20 +2,16 @@
 
 # Client Methods
 
-`oauth-codex` provides two symmetric client classes:
+`oauth-codex` exposes two first-class clients:
 
 | Class | Import | Use when |
 |---|---|---|
 | `Client` | `from oauth_codex import Client` | Synchronous / blocking code |
 | `AsyncClient` | `from oauth_codex import AsyncClient` | `async`/`await` code, event loops |
 
-Both classes expose the **same** `chat.completions.create`, `generate`, `stream`, and `responses` interfaces. `AsyncClient` methods are async-native (`await` / `async for`), while `Client` methods are synchronous — plus `agenerate`/`astream` bridge methods for calling async from the sync client.
-
----
+Both clients expose the same namespaces. The async client uses native async methods; the sync client uses blocking methods.
 
 ## Construction
-
-### Sync Client
 
 ```python
 from oauth_codex import Client
@@ -23,47 +19,24 @@ from oauth_codex import Client
 client = Client()
 ```
 
-### Async Client
-
 ```python
 from oauth_codex import AsyncClient
 
 client = AsyncClient()
 ```
 
-Authenticate immediately at construction time (sync only):
-
-```python
-client = Client(authenticate_on_init=True)
-```
-
----
-
 ## Authentication
 
-Tokens are stored locally and refreshed automatically. On first use (or when the stored token is missing/expired) interactive OAuth login is triggered.
+Call `authenticate()` once before the first request to trigger interactive OAuth login when needed.
 
 ```python
-# Sync: block until login is complete
 client.authenticate()
-
-# Async: non-blocking
 await client.authenticate()
 ```
 
-`Client` constructor option:
-
-```python
-client = Client(authenticate_on_init=True)  # login immediately in __init__
-```
-
----
+Tokens are stored locally and refreshed automatically on later requests.
 
 ## Chat Completions
-
-The primary interface — identical to the OpenAI Python SDK.
-
-### Sync
 
 ```python
 response = client.chat.completions.create(
@@ -73,8 +46,6 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-### Async
-
 ```python
 response = await client.chat.completions.create(
     model="gpt-5.3-codex",
@@ -83,184 +54,105 @@ response = await client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-### Full example with system prompt
-
-```python
-response = client.chat.completions.create(
-    model="gpt-5.3-codex",
-    messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Write a Python function to sort a list."},
-    ],
-    temperature=0.7,
-    max_tokens=500,
-)
-print(response.choices[0].message.content)
-```
-
----
-
-## `generate` — Text Generation with Automatic Tool Execution
-
-`generate` returns the final text (or a structured dict when `output_schema` is set). It handles multi-round function calling automatically.
-
-### Sync (`Client`)
-
-```python
-text = client.generate([{"role": "user", "content": "hello"}])
-print(text)
-```
-
-### Async (`AsyncClient`)
-
-```python
-text = await client.generate([{"role": "user", "content": "hello"}])
-print(text)
-```
-
-> **Note:** The sync `Client` also exposes `agenerate` as a convenience async alias:
-> `text = await sync_client.agenerate([...])`
-
----
-
-## `stream` — Streaming Text Deltas
-
-### Sync streaming (`Client`)
-
-```python
-for chunk in client.stream([{"role": "user", "content": "Tell me a story"}]):
-    print(chunk, end="", flush=True)
-```
-
-### Async streaming (`AsyncClient`)
-
-```python
-async for chunk in client.stream([{"role": "user", "content": "Tell me a story"}]):
-    print(chunk, end="", flush=True)
-```
-
-> The sync `Client` also exposes `astream` as a convenience async alias.
-
----
-
-## Image Input Analysis
-
-Pass multimodal content via `client.chat.completions.create`:
-
-```python
-response = client.chat.completions.create(
-    model="gpt-5.3-codex",
-    messages=[
-        {
-            "role": "user",
-            "content": [
-                {"type": "input_text", "text": "Describe this image"},
-                {"type": "input_image", "image_url": "https://example.com/photo.png"},
-            ],
-        }
-    ],
-)
-```
-
----
-
-## Function Calling (Automatic)
-
-Pass Python callables directly. The SDK serializes their signatures, sends tool definitions to the model, and executes the returned calls automatically.
-
-```python
-def get_weather(city: str) -> dict:
-    return {"city": city, "weather": "sunny"}
-
-# Sync
-text = client.generate(
-    [{"role": "user", "content": "What's the weather in Seoul?"}],
-    tools=[get_weather],
-)
-
-# Async
-text = await async_client.generate(
-    [{"role": "user", "content": "What's the weather in Seoul?"}],
-    tools=[get_weather],
-)
-```
-
-Async tools are supported in `AsyncClient.generate` (and `Client.agenerate`):
-
-```python
-async def fetch_data(url: str) -> dict:
-    ...  # async I/O
-
-text = await async_client.generate([...], tools=[fetch_data])
-```
-
----
-
-## Structured Output
-
-Pass a Pydantic model or a JSON Schema dict. The response is validated and returned as a dict.
+### Structured parsing
 
 ```python
 from pydantic import BaseModel
+
 
 class Summary(BaseModel):
     title: str
     score: int
 
-out = client.generate(
-    [{"role": "user", "content": "Return JSON"}],
-    output_schema=Summary,
+
+completion = client.chat.completions.parse(
+    model="gpt-5.3-codex",
+    messages=[{"role": "user", "content": "Return JSON with title and score"}],
+    response_format=Summary,
 )
-print(out)  # {"title": "...", "score": 1}
+print(completion.parsed)
 ```
 
----
+## Responses Resource
 
-## Responses Resource (Low-level)
-
-For direct access to the Codex backend responses API:
+`responses` gives lower-level access to the backend payload shape.
 
 ```python
-# Sync
 response = client.responses.create(
     model="gpt-5.3-codex",
     input=[{"role": "user", "content": "Analyze this code."}],
 )
-
-# Async
-response = await client.responses.create(
-    model="gpt-5.3-codex",
-    input=[{"role": "user", "content": "Analyze this code."}],
-)
+print(response.output_text)
 ```
 
----
+### Parse structured output
 
-## API Surface at a Glance
+```python
+response = client.responses.parse(
+    model="gpt-5.3-codex",
+    input=[{"role": "user", "content": "Return JSON with title and score"}],
+    response_format=Summary,
+)
+print(response.parsed)
+```
 
-### `oauth_codex.Client` (sync)
+### Stream events
 
-| Method | Returns |
-|---|---|
-| `client.chat.completions.create(...)` | `ChatCompletion` |
-| `client.responses.create(...)` | raw response |
-| `client.generate(messages, ...)` | `str \| dict` |
-| `client.stream(messages, ...)` | `Iterator[str]` |
-| `client.agenerate(messages, ...)` | `Awaitable[str \| dict]` |
-| `client.astream(messages, ...)` | `AsyncIterator[str]` |
-| `client.authenticate()` | `None` |
+```python
+for event in client.responses.stream(
+    model="gpt-5.3-codex",
+    input=[{"role": "user", "content": "Say hello"}],
+):
+    if event.type == "text_delta" and event.delta:
+        print(event.delta, end="", flush=True)
+```
 
-### `oauth_codex.AsyncClient` (async)
+### Input token counting
 
-| Method | Returns |
-|---|---|
-| `await client.chat.completions.create(...)` | `ChatCompletion` |
-| `await client.responses.create(...)` | raw response |
-| `await client.generate(messages, ...)` | `str \| dict` |
-| `async for chunk in client.stream(...)` | `AsyncIterator[str]` |
-| `await client.authenticate()` | `None` |
+```python
+tokens = client.responses.input_tokens.count(
+    model="gpt-5.3-codex",
+    input="hello",
+)
+print(tokens.input_tokens)
+```
 
----
+## Beta Tool Loop
+
+Use `beta.chat.completions.run_tools(...)` to let the SDK execute callable tools across multiple rounds.
+
+```python
+def add(a: int, b: int) -> int:
+    return a + b
+
+
+completion = client.beta.chat.completions.run_tools(
+    model="gpt-5.3-codex",
+    messages=[{"role": "user", "content": "What is 1 + 2?"}],
+    tools=[add],
+)
+print(completion.choices[0].message.content)
+```
+
+`AsyncClient` exposes `await client.beta.chat.completions.arun_tools(...)` for async callables.
+
+## Files, Vector Stores, and Models
+
+```python
+uploaded = client.files.create(file=b"hello", purpose="assistants")
+vector_store = client.vector_stores.create(name="docs", file_ids=[uploaded.id])
+linked = client.vector_stores.files.create(vector_store.id, file_id=uploaded.id)
+batch = client.vector_stores.file_batches.create(vector_store.id, file_ids=[uploaded.id])
+models = client.models.list()
+print(uploaded.id, vector_store.id, linked.id, batch.id, models.object)
+```
+
+## Removed In 4.0
+
+- `authenticate_on_init`
+- `generate`, `agenerate`, `stream`, `astream`
+- `OAuthCodexClient`, `AsyncOAuthCodexClient`
+- module-level proxy calls such as `oauth_codex.responses.create(...)`
 
 ## See also
 

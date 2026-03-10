@@ -4,6 +4,7 @@ from typing import Any
 
 from oauth_codex._models import BaseModel
 
+from .file_batches import AsyncFileBatches, FileBatches
 from .files import AsyncFiles, Files
 
 
@@ -23,10 +24,20 @@ class VectorStoreList(BaseModel):
 class VectorStores:
     def __init__(self, client: Any) -> None:
         self._client = client
+        self._files: Files | None = None
+        self._file_batches: FileBatches | None = None
 
     @property
     def files(self) -> Files:
-        return Files(self._client)
+        if self._files is None:
+            self._files = Files(self._client)
+        return self._files
+
+    @property
+    def file_batches(self) -> FileBatches:
+        if self._file_batches is None:
+            self._file_batches = FileBatches(self._client)
+        return self._file_batches
 
     def create(
         self, *, name: str | None = None, file_ids: list[str] | None = None
@@ -58,10 +69,20 @@ class VectorStores:
 class AsyncVectorStores:
     def __init__(self, client: Any) -> None:
         self._client = client
+        self._files: AsyncFiles | None = None
+        self._file_batches: AsyncFileBatches | None = None
 
     @property
     def files(self) -> AsyncFiles:
-        return AsyncFiles(self._client)
+        if self._files is None:
+            self._files = AsyncFiles(self._client)
+        return self._files
+
+    @property
+    def file_batches(self) -> AsyncFileBatches:
+        if self._file_batches is None:
+            self._file_batches = AsyncFileBatches(self._client)
+        return self._file_batches
 
     async def create(
         self, *, name: str | None = None, file_ids: list[str] | None = None

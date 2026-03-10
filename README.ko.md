@@ -4,11 +4,12 @@
 
 Codex 백엔드를 위한 OAuth PKCE 기반 Python SDK입니다.
 
-## 주요 특징
+## 핵심 특징
 
-- **OpenAI 스타일 API**: `client.chat.completions.create` 및 `client.responses.create`를 통해 익숙하고 현대적인 인터페이스를 제공합니다.
-- **엄격한 동기/비동기 분리**: `oauth_codex.Client`(동기 전용)와 `oauth_codex.AsyncClient`(비동기 전용)가 완전히 분리되어 있습니다.
-- **OAuth PKCE 전용 인증**: API 키를 일절 사용하지 않으며, 보안성이 높은 OAuth PKCE 방식만을 지원합니다.
+- `Client`, `AsyncClient` 기반 리소스형 SDK
+- OAuth PKCE 전용 인증과 자동 토큰 갱신
+- `chat.completions.create(...)` 및 `responses.create(...)`
+- `beta.chat.completions.run_tools(...)`를 통한 callable tool loop 지원
 
 ## 설치
 
@@ -16,128 +17,158 @@ Codex 백엔드를 위한 OAuth PKCE 기반 Python SDK입니다.
 pip install oauth-codex
 ```
 
+Python 3.11 이상이 필요합니다.
+
 ## 빠른 시작
 
-### 동기 방식 (`Client`)
+### 동기 클라이언트
 
 ```python
 from oauth_codex import Client
 
-client = Client(authenticate_on_init=True)
+client = Client()
+client.authenticate()
 
-# 현대적인 OpenAI 스타일 API
 completion = client.chat.completions.create(
     model="gpt-5.3-codex",
-    messages=[{"role": "user", "content": "안녕하세요!"}]
+    messages=[{"role": "user", "content": "oauth-codex 안녕"}],
 )
 print(completion.choices[0].message.content)
-
 ```
 
-### 비동기 방식 (`AsyncClient`)
+### 비동기 클라이언트
 
 ```python
 import asyncio
+
 from oauth_codex import AsyncClient
+
 
 async def main():
     client = AsyncClient()
     await client.authenticate()
 
-    # 현대적인 OpenAI 스타일 API
     completion = await client.chat.completions.create(
         model="gpt-5.3-codex",
-        messages=[{"role": "user", "content": "비동기로 안녕!"}]
+        messages=[{"role": "user", "content": "비동기 호출"}],
     )
     print(completion.choices[0].message.content)
+
 
 asyncio.run(main())
 ```
 
-> **중요**: `Client`와 `AsyncClient`는 완전히 분리된 클래스입니다. `Client`는 동기 컨텍스트 전용이며, `AsyncClient`는 비동기 컨텍스트(`async def`) 전용입니다. 혼용하지 마십시오.
+## 인증
 
-## 인증 (Authentication)
+이 SDK는 API 키를 지원하지 않고 OAuth PKCE만 사용합니다.
 
-이 SDK는 **OAuth PKCE 인증만을 독점적으로 사용합니다.** API 키는 지원하지 않습니다.
-
-`client.authenticate()`를 명시적으로 호출하거나, `Client(authenticate_on_init=True)`로 초기화 시 즉시 인증을 수행할 수 있습니다.
+최초 인증 시 SDK가 브라우저용 인증 URL을 출력하고, 로그인 후 리디렉트된 `localhost` callback URL을 터미널에 붙여넣도록 안내합니다. 이후에는 저장된 토큰을 자동으로 재사용하고 만료 시 자동으로 갱신합니다.
 
 ```python
-# 초기화 시 즉시 인증 (동기)
-client = Client(authenticate_on_init=True)
-
-# 명시적 인증 (비동기)
-async def main():
-    client = AsyncClient()
-    await client.authenticate()
+client = Client()
+client.authenticate()
 ```
 
-인증 흐름:
-1. 로컬 토큰 저장소에서 유효한 토큰을 조회합니다.
-2. 토큰이 없거나 만료된 경우, 인증 URL을 출력하고 브라우저 로그인을 유도합니다.
-3. 브라우저 로그인 완료 후, 터미널에 리다이렉트된 `localhost` URL을 붙여넣어 인증을 완료합니다.
-
-API 호출 중 토큰이 만료되면 자동으로 갱신됩니다.
-
-## 현대적 API 안내
+## 주요 API
 
 ### Chat Completions
-
-`chat.completions.create`는 OpenAI 명세를 따릅니다.
 
 ```python
 response = client.chat.completions.create(
     model="gpt-5.3-codex",
-    messages=[
-        {"role": "system", "content": "당신은 유능한 코드 리뷰어입니다."},
-        {"role": "user", "content": "이 Python 함수의 문제점을 알려줘."}
-    ],
-    temperature=0.7,
-    max_tokens=1024
+    messages=[{"role": "user", "content": "정렬 함수를 작성해줘"}],
 )
 print(response.choices[0].message.content)
 ```
 
 ### Responses 리소스
 
-Codex 백엔드의 핵심 리소스인 `responses`에 직접 접근하여 더 세밀한 제어가 가능합니다.
-
 ```python
 response = client.responses.create(
     model="gpt-5.3-codex",
-    input=[{"role": "user", "content": "다음 코드를 분석해줘: ..."}]
+    input=[{"role": "user", "content": "다음 코드를 분석해줘"}],
 )
+print(response.output_text)
 ```
 
-`AsyncClient`에서도 동일한 인터페이스를 사용합니다:
+### 스트리밍
 
 ```python
-response = await client.responses.create(
+for event in client.responses.stream(
     model="gpt-5.3-codex",
-    input=[{"role": "user", "content": "비동기 분석 요청"}]
-)
+    input=[{"role": "user", "content": "세 단어로 인사해줘"}],
+):
+    if event.type == "text_delta" and event.delta:
+        print(event.delta, end="", flush=True)
 ```
 
-## `Client` vs `AsyncClient` — 핵심 차이점
+### 구조화 출력
 
-| 항목 | `Client` | `AsyncClient` |
-|---|---|---|
-| 사용 컨텍스트 | 일반 함수(`def`) | 비동기 함수(`async def`) |
-| HTTP 드라이버 | `httpx` (동기) | `httpx` (비동기) |
-| 인증 초기화 | `Client(authenticate_on_init=True)` | `await client.authenticate()` |
+```python
+from pydantic import BaseModel
+
+
+class Summary(BaseModel):
+    title: str
+    score: int
+
+
+response = client.responses.parse(
+    model="gpt-5.3-codex",
+    input=[{"role": "user", "content": "title과 score를 가진 JSON을 반환해줘"}],
+    response_format=Summary,
+)
+print(response.parsed)
+```
+
+### Tool Loop
+
+```python
+def add(a: int, b: int) -> int:
+    return a + b
+
+
+completion = client.beta.chat.completions.run_tools(
+    model="gpt-5.3-codex",
+    messages=[{"role": "user", "content": "2 + 3은 얼마야?"}],
+    tools=[add],
+)
+print(completion.choices[0].message.content)
+```
+
+## 제공 네임스페이스
+
+- `client.chat.completions`
+- `client.responses`
+- `client.files`
+- `client.vector_stores`
+- `client.vector_stores.files`
+- `client.vector_stores.file_batches`
+- `client.models`
+- `client.beta.chat.completions`
+
+`AsyncClient`도 같은 네임스페이스를 비동기 방식으로 제공합니다.
+
+## 4.0에서 제거된 표면
+
+- `authenticate_on_init`
+- `generate`, `agenerate`, `stream`, `astream`
+- 레거시 `OAuthCodexClient`, `AsyncOAuthCodexClient`
+- `oauth_codex.responses.create(...)` 같은 모듈 레벨 프록시 호출
 
 ## 문서
 
 - 영문 문서: [`docs/en/index.md`](docs/en/index.md)
 - 한국어 문서: [`docs/ko/index.md`](docs/ko/index.md)
 
-## 개발 및 테스트
+## 개발
 
 ```bash
-# 테스트 실행
+pip install -e .[dev]
 pytest -q
+python -m build
 ```
 
 ## 변경 이력
 
-최신 변경 사항은 [CHANGELOG.md](CHANGELOG.md)에서 확인할 수 있습니다.
+[CHANGELOG.md](CHANGELOG.md)

@@ -63,3 +63,13 @@ def test_legacy_modules_removed() -> None:
 def test_compat_module_removed() -> None:
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("oauth_codex.compat")
+
+
+def test_internal_legacy_modules_removed() -> None:
+    for name in [
+        "oauth_codex._engine",
+        "oauth_codex._module_client",
+        "oauth_codex.compat_store",
+    ]:
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(name)

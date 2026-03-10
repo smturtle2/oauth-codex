@@ -11,6 +11,8 @@ from oauth_codex.core_types import OAuthTokens
 def test_client_classes_expose_modern_api_only() -> None:
     assert inspect.isclass(oauth_codex.Client)
     assert inspect.isclass(oauth_codex.AsyncClient)
+    assert hasattr(oauth_codex.Client, "authenticate")
+    assert hasattr(oauth_codex.AsyncClient, "authenticate")
     assert not hasattr(oauth_codex.Client, "generate")
     assert not hasattr(oauth_codex.Client, "stream")
     assert not hasattr(oauth_codex.AsyncClient, "agenerate")

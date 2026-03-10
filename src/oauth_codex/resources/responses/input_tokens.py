@@ -12,6 +12,12 @@ from .._wrappers import (
 from ...types.responses import InputTokenCountResponse
 
 
+def _count_result_value(result: Any, field: str) -> Any:
+    if isinstance(result, dict):
+        return result.get(field)
+    return getattr(result, field, None)
+
+
 class InputTokens(SyncAPIResource):
     def count(
         self,
@@ -27,9 +33,9 @@ class InputTokens(SyncAPIResource):
             tools=tools,
         )
         return InputTokenCountResponse(
-            input_tokens=result.input_tokens,
-            cached_tokens=result.cached_tokens,
-            total_tokens=result.total_tokens,
+            input_tokens=_count_result_value(result, "input_tokens"),
+            cached_tokens=_count_result_value(result, "cached_tokens"),
+            total_tokens=_count_result_value(result, "total_tokens"),
         )
 
     @property
@@ -56,9 +62,9 @@ class AsyncInputTokens(AsyncAPIResource):
             tools=tools,
         )
         return InputTokenCountResponse(
-            input_tokens=result.input_tokens,
-            cached_tokens=result.cached_tokens,
-            total_tokens=result.total_tokens,
+            input_tokens=_count_result_value(result, "input_tokens"),
+            cached_tokens=_count_result_value(result, "cached_tokens"),
+            total_tokens=_count_result_value(result, "total_tokens"),
         )
 
     @property

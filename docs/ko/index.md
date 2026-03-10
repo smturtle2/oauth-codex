@@ -1,13 +1,13 @@
 [English](../en/index.md) | [한국어](index.md)
 
-# oauth-codex 문서 인덱스 (한국어)
+# oauth-codex 문서 (한국어)
 
 ## 시작하기
 
-- [README (국문)](../../README.ko.md)
+- [README (한국어)](../../README.ko.md)
 - [Client 메서드](methods/client.md)
 
-## 마이그레이션
+## 업그레이드 및 마이그레이션
 
 - [Migration: OpenAI SDK -> oauth-codex](../migration_openai_to_oauth_codex.md)
 - [제거된 API 안내](methods/removed_apis.md)

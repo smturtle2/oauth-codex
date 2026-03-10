@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Iterator, Mapping
-from types import SimpleNamespace
 from typing import Any, cast
 
 import httpx
@@ -33,16 +32,6 @@ def _with_auth_headers(
     if auth_headers:
         merged.update(auth_headers)
     return merged
-
-
-def _to_namespace(value: Any) -> Any:
-    if isinstance(value, dict):
-        return SimpleNamespace(**{k: _to_namespace(v) for k, v in value.items()})
-    if isinstance(value, list):
-        return [_to_namespace(v) for v in value]
-    return value
-
-
 def _payload_without_none(values: dict[str, Any]) -> dict[str, Any]:
     payload = {k: v for k, v in values.items() if v is not None}
     payload.pop("self", None)
@@ -131,7 +120,11 @@ class Client(SyncAPIClient):
         self._chat: Chat | None = None
         self._beta: Beta | None = None
         self._auth_provider: SyncAuthProvider | None = None
+        self._vector_file_batches: dict[str, dict[str, Any]] = {}
         self._engine = _SyncEngine(self)
+
+    def authenticate(self) -> None:
+        self.auth.ensure_valid(interactive=True)
 
     @property
     def auth(self) -> SyncAuthProvider:
@@ -232,7 +225,11 @@ class AsyncClient(AsyncAPIClient):
         self._chat: AsyncChat | None = None
         self._beta: AsyncBeta | None = None
         self._auth_provider: AsyncAuthProvider | None = None
+        self._vector_file_batches: dict[str, dict[str, Any]] = {}
         self._engine = _AsyncEngine(self)
+
+    async def authenticate(self) -> None:
+        await self.auth.aensure_valid(interactive=True)
 
     @property
     def auth(self) -> AsyncAuthProvider:

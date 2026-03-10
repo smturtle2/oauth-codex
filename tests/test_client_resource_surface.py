@@ -27,6 +27,8 @@ def test_client_exposes_resource_namespaces() -> None:
     assert client.responses is client.responses
     assert client.files is client.files
     assert client.vector_stores is client.vector_stores
+    assert client.vector_stores.files is client.vector_stores.files
+    assert client.vector_stores.file_batches is client.vector_stores.file_batches
     assert client.models is client.models
     assert client.chat is client.chat
 
@@ -52,7 +54,7 @@ def test_client_responses_resource_uses_engine_create(monkeypatch) -> None:
         )
 
     def fake_responses_input_tokens_count(**_kwargs: Any) -> Any:
-        return SimpleNamespace(input_tokens=42, cached_tokens=0, total_tokens=42)
+        return {"input_tokens": 42, "cached_tokens": 0, "total_tokens": 42}
 
     monkeypatch.setattr(client._engine, "responses_create", fake_responses_create)
     monkeypatch.setattr(
@@ -69,6 +71,7 @@ def test_client_responses_resource_uses_engine_create(monkeypatch) -> None:
 
     tokens = client.responses.input_tokens.count(model="gpt-5.3-codex", input="hello")
     assert tokens.input_tokens == 42
+    assert tokens.total_tokens == 42
 
 
 def test_client_other_resources_delegate_to_engine(monkeypatch) -> None:
@@ -111,3 +114,36 @@ def test_client_other_resources_delegate_to_engine(monkeypatch) -> None:
 
     out_model = client.models.list()
     assert out_model.object == "list"
+
+
+def test_vector_store_file_batches_use_client_state(
+    monkeypatch: Any,
+) -> None:
+    client = _client()
+    uploaded_files: list[tuple[str, str]] = []
+    file_ids = {"next": 0}
+
+    def fake_file_create(*, file: Any, purpose: str, **metadata: Any) -> Any:
+        _ = (file, purpose, metadata)
+        file_ids["next"] += 1
+        return SimpleNamespace(id=f"file_{file_ids['next']}", object="file")
+
+    def fake_vs_file_create(vector_store_id: str, *, file_id: str) -> Any:
+        uploaded_files.append((vector_store_id, file_id))
+        return SimpleNamespace(
+            id=file_id,
+            object="vector_store.file",
+            vector_store_id=vector_store_id,
+        )
+
+    monkeypatch.setattr(client.files, "create", fake_file_create)
+    monkeypatch.setattr(client.vector_stores.files, "create", fake_vs_file_create)
+
+    batch = client.vector_stores.file_batches.upload_and_poll(
+        "vs_123",
+        files=[b"one", b"two"],
+    )
+
+    assert batch.vector_store_id == "vs_123"
+    assert batch.status == "completed"
+    assert uploaded_files == [("vs_123", "file_1"), ("vs_123", "file_2")]

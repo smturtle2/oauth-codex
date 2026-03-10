@@ -7,7 +7,7 @@
 - [README (English)](../../README.md)
 - [Client Methods](methods/client.md)
 
-## Migration
+## Upgrade And Migration
 
 - [Migration: OpenAI SDK -> oauth-codex](../migration_openai_to_oauth_codex.md)
 - [Removed APIs Guide](methods/removed_apis.md)

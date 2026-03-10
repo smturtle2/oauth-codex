@@ -2,13 +2,15 @@
 
 # oauth-codex
 
-OAuth PKCE-based Python SDK for the Codex backend — version 3.x.
+OAuth PKCE-based Python SDK for the Codex backend.
 
-## Key Features
+## Highlights
 
-- **OpenAI-style API**: Familiar `client.chat.completions.create` and `client.responses.create` interfaces.
-- **Strict Sync/Async Separation**: `oauth_codex.Client` for synchronous code; `oauth_codex.AsyncClient` for async code. Never mix them.
-- **OAuth PKCE Only**: Authentication is exclusively via OAuth PKCE. No API keys are supported or required.
+- Resource-style clients: `Client` and `AsyncClient`
+- OAuth PKCE only, with interactive login and automatic token refresh
+- OpenAI-style `chat.completions.create(...)`
+- Lower-level `responses.create(...)`, `responses.parse(...)`, and `responses.stream(...)`
+- Callable tool loop helpers via `client.beta.chat.completions.run_tools(...)`
 
 ## Installation
 
@@ -16,29 +18,32 @@ OAuth PKCE-based Python SDK for the Codex backend — version 3.x.
 pip install oauth-codex
 ```
 
-Requires Python 3.11+.
+Requires Python 3.11 or newer.
 
 ## Quick Start
 
-### Synchronous
+### Synchronous Client
 
 ```python
 from oauth_codex import Client
 
-client = Client(authenticate_on_init=True)
+client = Client()
+client.authenticate()
 
 completion = client.chat.completions.create(
     model="gpt-5.3-codex",
-    messages=[{"role": "user", "content": "Hello, how are you?"}],
+    messages=[{"role": "user", "content": "Hello from oauth-codex"}],
 )
 print(completion.choices[0].message.content)
 ```
 
-### Asynchronous
+### Asynchronous Client
 
 ```python
 import asyncio
+
 from oauth_codex import AsyncClient
+
 
 async def main():
     client = AsyncClient()
@@ -46,148 +51,115 @@ async def main():
 
     completion = await client.chat.completions.create(
         model="gpt-5.3-codex",
-        messages=[{"role": "user", "content": "Hello async!"}],
+        messages=[{"role": "user", "content": "Hello async"}],
     )
     print(completion.choices[0].message.content)
+
 
 asyncio.run(main())
 ```
 
 ## Authentication
 
-This SDK exclusively uses **OAuth PKCE**. No API keys are accepted.
-
-Authentication is interactive the first time:
-
-1. Call `client.authenticate()` (sync) or `await client.authenticate()` (async), or pass `authenticate_on_init=True` to `Client`.
-2. The SDK checks for stored tokens. If none exist or they are expired, it prints an authorization URL.
-3. Open the URL in a browser, sign in, then paste the localhost callback URL back into the terminal to complete the flow.
-
-Tokens are persisted locally and refreshed automatically before each request.
+This SDK uses OAuth PKCE only. API keys are not supported.
 
 ```python
-# Sync: authenticate eagerly at construction time
-client = Client(authenticate_on_init=True)
-
-# Sync: authenticate lazily before first use
 client = Client()
 client.authenticate()
-
-# Async: authenticate before first use
-client = AsyncClient()
-await client.authenticate()
 ```
 
-### Token Utilities
+On first authentication, the SDK prints an authorization URL, waits for the browser sign-in flow, and asks you to paste the localhost callback URL back into the terminal. Tokens are stored locally and refreshed automatically on later requests.
 
-```python
-client.is_authenticated()          # bool — tokens are present
-client.is_expired(leeway_seconds=60)  # bool — token is expired or near-expiry
-client.refresh_if_needed()         # bool — refreshed if needed, returns True on refresh
-client.login()                     # force interactive login flow (sync)
-await client.alogin()              # force interactive login flow (async, from AsyncClient or OAuthCodexClient)
-```
-
-## Modern API
+## Main API Surface
 
 ### Chat Completions
-
-`client.chat.completions.create` follows the OpenAI Chat Completions specification.
 
 ```python
 response = client.chat.completions.create(
     model="gpt-5.3-codex",
-    messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Write a Python function to sort a list."},
-    ],
-    temperature=0.7,
-    max_tokens=500,
+    messages=[{"role": "user", "content": "Write a sorting function"}],
 )
 print(response.choices[0].message.content)
 ```
 
-Async equivalent:
-
-```python
-response = await client.chat.completions.create(
-    model="gpt-5.3-codex",
-    messages=[{"role": "user", "content": "Write a Python function to sort a list."}],
-)
-```
-
 ### Responses Resource
-
-`client.responses.create` provides lower-level access to the Codex backend using the Responses API shape.
 
 ```python
 response = client.responses.create(
     model="gpt-5.3-codex",
     input=[{"role": "user", "content": "Analyze this code snippet."}],
 )
+print(response.output_text)
 ```
 
-Async equivalent:
+### Streaming
 
 ```python
-response = await client.responses.create(
+for event in client.responses.stream(
     model="gpt-5.3-codex",
-    input=[{"role": "user", "content": "Analyze this code snippet."}],
-)
+    input=[{"role": "user", "content": "Say hello in three words"}],
+):
+    if event.type == "text_delta" and event.delta:
+        print(event.delta, end="", flush=True)
 ```
 
-## Sync/Async Separation
-
-`oauth_codex.Client` and `oauth_codex.AsyncClient` are **strictly separate** classes. Do not use `Client` inside an async event loop or `AsyncClient` in synchronous code.
-
-| Class | Import | Authentication |
-|---|---|---|
-| `Client` | `from oauth_codex import Client` | `client.authenticate()` |
-| `AsyncClient` | `from oauth_codex import AsyncClient` | `await client.authenticate()` |
-
-Both classes expose identical resource namespaces: `chat`, `responses`, `files`, `vector_stores`, `models`.
-
-## Client Configuration
+### Structured Output
 
 ```python
-from oauth_codex import Client
+from pydantic import BaseModel
 
-client = Client(
-    base_url="https://chatgpt.com/backend-api/codex",  # optional override
-    timeout=60.0,                # request timeout in seconds
-    max_retries=2,               # retry count for retryable errors
-    authenticate_on_init=True,   # trigger auth during __init__
+
+class Summary(BaseModel):
+    title: str
+    score: int
+
+
+response = client.responses.parse(
+    model="gpt-5.3-codex",
+    input=[{"role": "user", "content": "Return JSON with title and score"}],
+    response_format=Summary,
 )
+print(response.parsed)
 ```
 
-`AsyncClient` accepts the same constructor arguments.
+### Tool Execution
+
+```python
+def add(a: int, b: int) -> int:
+    return a + b
+
+
+completion = client.beta.chat.completions.run_tools(
+    model="gpt-5.3-codex",
+    messages=[{"role": "user", "content": "What is 2 + 3?"}],
+    tools=[add],
+)
+print(completion.choices[0].message.content)
+```
+
+## Available Namespaces
+
+- `client.chat.completions`
+- `client.responses`
+- `client.files`
+- `client.vector_stores`
+- `client.vector_stores.files`
+- `client.vector_stores.file_batches`
+- `client.models`
+- `client.beta.chat.completions`
+
+`AsyncClient` exposes the same namespaces with async methods.
+
+## Removed In 4.0
+
+- `authenticate_on_init`
+- `generate`, `agenerate`, `stream`, `astream`
+- legacy `OAuthCodexClient` and `AsyncOAuthCodexClient`
+- module-level proxy usage such as `oauth_codex.responses.create(...)`
 
 ## Error Handling
 
-```python
-from oauth_codex import (
-    AuthenticationError,
-    RateLimitError,
-    APIConnectionError,
-    APITimeoutError,
-    APIStatusError,
-    BadRequestError,
-    NotFoundError,
-    InternalServerError,
-)
-
-try:
-    response = client.chat.completions.create(
-        model="gpt-5.3-codex",
-        messages=[{"role": "user", "content": "Hello"}],
-    )
-except AuthenticationError:
-    print("OAuth token missing or invalid — call client.authenticate()")
-except RateLimitError:
-    print("Rate limit hit — back off and retry")
-except APIStatusError as e:
-    print(f"HTTP {e.status_code}: {e.message}")
-```
+The package exports OpenAI-style exception classes such as `AuthenticationError`, `RateLimitError`, `APIConnectionError`, and `APIStatusError`.
 
 ## Documentation
 
@@ -197,7 +169,9 @@ except APIStatusError as e:
 ## Development
 
 ```bash
+pip install -e .[dev]
 pytest -q
+python -m build
 ```
 
 ## Changelog

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oauth-codex"
-version = "3.2.3"
-description = "Codex OAuth-based Python SDK with a single Client and generate-first API"
+dynamic = ["version"]
+description = "Codex OAuth-based Python SDK with resource-style Client and AsyncClient APIs"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Codex" }]
@@ -17,8 +17,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "build>=1.2.0",
   "pytest>=8.0.0",
   "pytest-asyncio>=0.23.0",
+  "twine>=5.0.0",
 ]
 
 [tool.setuptools]
@@ -27,9 +29,14 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.dynamic]
+version = {attr = "oauth_codex._version.__version__"}
+
 [tool.setuptools.package-data]
 oauth_codex = ["py.typed"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
+asyncio_mode = "auto"
 pythonpath = ["src"]
+testpaths = ["tests"]
